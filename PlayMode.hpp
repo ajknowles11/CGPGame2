@@ -16,6 +16,9 @@ struct PlayMode : Mode {
 	virtual void update(float elapsed) override;
 	virtual void draw(glm::uvec2 const &drawable_size) override;
 
+	float fps;
+	bool show_fps = true;
+
 	//----- game state -----
 
 	//input tracking:

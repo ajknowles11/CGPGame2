@@ -132,6 +132,7 @@ bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 }
 
 void PlayMode::update(float elapsed) {
+	fps = 1.f / elapsed;
 
 	// //slowly rotates through [0,1):
 	// wobble += elapsed / 10.0f;
@@ -172,8 +173,8 @@ void PlayMode::update(float elapsed) {
 		player->position += move.x * frame_right + move.y * frame_forward;
 	}
 
-	{ // Attach club to hand with position only
-		club->position = player->position;
+	{ // attach club to hand with position only
+		club->position = hand->position;
 	}
 
 	//reset button press counters:
@@ -226,5 +227,12 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 			glm::vec3(-aspect + 0.1f * H + ofs, -1.0 + 0.1f * H + ofs, 0.0),
 			glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
 			glm::u8vec4(0xff, 0xff, 0xff, 0x00));
+
+		if (show_fps) {
+			lines.draw_text(std::to_string(fps), 
+			glm::vec3(-aspect + 0.1f * H, 1.0 - H, 0.0),
+			glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f), 
+			glm::u8vec4(0xff, 0xff, 0xff, 0x00));
+		}
 	}
 }
