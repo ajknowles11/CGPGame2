@@ -93,6 +93,9 @@ bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 			down.pressed = true;
 			return true;
 		}
+		if (evt.key.keysym.sym == SDLK_F3) {
+			show_fps = !show_fps;
+		}
 	} else if (evt.type == SDL_KEYUP) {
 		if (evt.key.keysym.sym == SDLK_a) {
 			left.pressed = false;
@@ -178,7 +181,9 @@ void PlayMode::update(float elapsed) {
 	}
 
 	{ // attach club to hand with position only
-		club->position = hand->position;
+		glm::mat4x3 hand_world = hand->make_local_to_world();
+		club->position = hand_world * glm::vec4(0.0f,0.0f,0.0f,1.0f);
+		club->rotation = glm::angleAxis(glm::eulerAngles(player->rotation).z, glm::vec3(0.0f,0.0f,1.0f));
 	}
 
 	//reset button press counters:

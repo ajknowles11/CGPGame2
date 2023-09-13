@@ -17,7 +17,7 @@ struct PlayMode : Mode {
 	virtual void draw(glm::uvec2 const &drawable_size) override;
 
 	float fps;
-	bool show_fps = true;
+	bool show_fps = false;
 
 	//----- game state -----
 
