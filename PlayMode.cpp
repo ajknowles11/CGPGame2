@@ -121,9 +121,13 @@ bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 			player->rotation = glm::normalize(
 				player->rotation * glm::angleAxis(-motion.x * camera->fovy, glm::vec3(0.0f, 0.0f, 1.0f))
 			);
-			camera->transform->rotation = glm::normalize(
-				camera->transform->rotation * glm::angleAxis(motion.y * camera->fovy, glm::vec3(1.0f, 0.0f, 0.0f))
-			);
+			const float adjust_camera_pitch = glm::clamp(camera_pitch + motion.y * camera->fovy, cam_pitch_min, cam_pitch_max) - camera_pitch;
+			if (glm::abs(adjust_camera_pitch) >= glm::epsilon<float>()) {
+				camera->transform->rotation = glm::normalize(
+					camera->transform->rotation * glm::angleAxis(adjust_camera_pitch, glm::vec3(1.0f, 0.0f, 0.0f))
+				);
+				camera_pitch += adjust_camera_pitch;
+			}
 			return true;
 		}
 	}
@@ -132,7 +136,7 @@ bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 }
 
 void PlayMode::update(float elapsed) {
-	fps = 1.f / elapsed;
+	fps = 1.0f / elapsed;
 
 	// //slowly rotates through [0,1):
 	// wobble += elapsed / 10.0f;
@@ -155,7 +159,7 @@ void PlayMode::update(float elapsed) {
 	{
 
 		//combine inputs into a move:
-		constexpr float PlayerSpeed = 30.0f;
+		constexpr float PlayerSpeed = 5.0f;
 		glm::vec2 move = glm::vec2(0.0f);
 		if (left.pressed && !right.pressed) move.x =-1.0f;
 		if (!left.pressed && right.pressed) move.x = 1.0f;

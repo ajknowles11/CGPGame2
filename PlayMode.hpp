@@ -42,6 +42,11 @@ struct PlayMode : Mode {
 	//player and camera:
 	Scene::Transform *player = nullptr;
 	Scene::Camera *camera = nullptr;
+	// track pitch separately for clamping
+	// idea from https://stackoverflow.com/questions/34971046/clamping-pitch-in-first-person-camera-using-quaternion-orientation
+	float camera_pitch;
+	const float cam_pitch_min = -glm::pi<float>()/2.0f;
+	const float cam_pitch_max = glm::pi<float>()/2.0f;
 
 	Scene::Transform *hand = nullptr;
 	Scene::Transform *club = nullptr;
