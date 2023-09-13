@@ -41,11 +41,13 @@ PlayMode::PlayMode() : scene(*hexapod_scene) {
 	for (auto &transform : scene.transforms) {
 		if (transform.name == "Player") player = &transform;
 		else if (transform.name == "Hand") hand = &transform;
+		else if (transform.name == "AimHand") aimhand = &transform;
 		else if (transform.name == "Club") club = &transform;
 	}
 
 	if (player == nullptr) throw std::runtime_error("Player not found.");
 	if (hand == nullptr) throw std::runtime_error("Hand not found.");
+	if (aimhand == nullptr) throw std::runtime_error("Hand not found.");
 	if (club == nullptr) throw std::runtime_error("Club not found.");
 
 	// //get pointers to leg for convenience:
@@ -180,9 +182,18 @@ void PlayMode::update(float elapsed) {
 		player->position += move.x * frame_right + move.y * frame_forward;
 	}
 
-	{ // attach club to hand with position only
-		glm::mat4x3 hand_world = hand->make_local_to_world();
-		club->position = hand_world * glm::vec4(0.0f,0.0f,0.0f,1.0f);
+	{ // attach club to hand
+		// we lerp between hand and aimhand (which is where club held while hitting ball)
+		float alpha = 1-(glm::clamp(glm::eulerAngles(camera->transform->rotation).x, cam_pitch_aim_end, cam_pitch_aim_start) - cam_pitch_aim_end) / (cam_pitch_aim_start - cam_pitch_aim_end);
+		std::cout << alpha << "\n";
+		glm::mat4x3 camera_world_transform = camera->transform->make_local_to_world(); // save like 0.00001s by computing once instead of twice
+		glm::mat4x3 hand_world = camera_world_transform * glm::mat4(hand->make_local_to_parent());
+		glm::mat4x3 aimhand_world = camera_world_transform * glm::mat4(aimhand->make_local_to_parent());
+
+		glm::vec3 start_pos = hand_world * glm::vec4(0,0,0,1.0f);
+		glm::vec3 end_pos = aimhand_world * glm::vec4(0,0,0,1.0f);
+
+		club->position = glm::mix(start_pos, end_pos, alpha);
 		club->rotation = glm::angleAxis(glm::eulerAngles(player->rotation).z, glm::vec3(0.0f,0.0f,1.0f));
 	}
 
