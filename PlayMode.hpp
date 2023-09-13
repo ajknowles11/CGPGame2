@@ -36,7 +36,11 @@ struct PlayMode : Mode {
 	glm::quat lower_leg_base_rotation;
 	float wobble = 0.0f;
 	
-	//camera:
+	//player and camera:
+	Scene::Transform *player = nullptr;
 	Scene::Camera *camera = nullptr;
+
+	Scene::Transform *hand = nullptr;
+	Scene::Transform *club = nullptr;
 
 };
