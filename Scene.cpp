@@ -450,14 +450,17 @@ Scene::CollisionPoints Scene::test_sphere_box(const Collider *a, const Transform
 	const float close_y = glm::max(b_b->min.y, glm::min(a_center.y, b_b->max.y));
 	const float close_z = glm::max(b_b->min.z, glm::min(a_center.z, b_b->max.z));
 
-	const glm::vec3 pt_b = glm::vec3(close_x, close_y, close_z);
+	const glm::vec3 pt_b = b_local_to_world * glm::vec4(close_x, close_y, close_z,1);
 
 	if (glm::distance(pt_b, a_center) > a_radius) {
 		return CollisionPoints();
 	}
 
-	const glm::vec3 normal = glm::normalize(a_center - pt_b);
-	const glm::vec3 pt_a = a_center - a_radius * normal;
+	const glm::vec3 a_center_world = b_local_to_world * glm::vec4(a_center,1);
+	const float a_radius_world = (b_local_to_world * glm::vec4(a_radius,0,0,0)).x;
+
+	const glm::vec3 normal = glm::normalize(a_center_world - pt_b);
+	const glm::vec3 pt_a = a_center_world - a_radius_world * normal;
 
 	const float depth = glm::distance(pt_b, pt_a);
 
