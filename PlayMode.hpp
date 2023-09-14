@@ -38,6 +38,14 @@ struct PlayMode : Mode {
 	float max_hit_velocity = 8.0f;
 	void swing();
 
+
+	// hole/ball stuff
+	const float hole_radius_start = 0.075f;
+	const float ball_radius_start = 0.02135f;
+	const float hole_pull_strength_start = 0.1f;
+	const float min_pull_strength = 0.2f;
+	float hole_scale = 1.0f;
+
 	//local copy of the game scene (so code can change it during gameplay):
 	Scene scene;
 	

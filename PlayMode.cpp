@@ -44,9 +44,9 @@ PlayMode::PlayMode() : scene(*level_scene) {
 		else if (transform.name == "AimHand") aimhand = &transform;
 		else if (transform.name == "Club") club = &transform;
 
-		else if (transform.name == "Hole") hole = new Scene::RigidBody(&transform, new Scene::SphereCollider(glm::vec3(0), 0.075f));
+		else if (transform.name == "Hole") hole = new Scene::RigidBody(&transform, new Scene::SphereCollider(glm::vec3(0), hole_radius_start));
 
-		else if (transform.name == "Ball") ball = new Scene::RigidBody(&transform, new Scene::SphereCollider(glm::vec3(0), 0.02135f));
+		else if (transform.name == "Ball") ball = new Scene::RigidBody(&transform, new Scene::SphereCollider(glm::vec3(0), ball_radius_start));
 		else if (transform.name == "Ground") collision_objects.emplace_back(new Scene::CollisionObject(&transform, new Scene::PlaneCollider(glm::vec3(0,0,1.0f), 0), 0.7f));
 
 		else if (transform.name.substr(0, 4) == "Wall"){
@@ -164,7 +164,7 @@ bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 
 void PlayMode::update(float elapsed) {
 	fps = 1.0f / elapsed;
-std::cout << "HOLE POSITION: " << hole->transform->position.x << ", " << hole->transform->position.y << ", " << hole->transform->position.z << "\n";
+
 	//move player:
 	{
 
@@ -307,6 +307,14 @@ void PlayMode::handle_physics(float elapsed) {
 			Scene::RigidBody *body = static_cast<Scene::RigidBody*>(obj);
 			body->force += body->mass * gravity;
 			body->force += -body->velocity * drag;
+			if (body->transform->name == "Ball") {
+				const float hole_dist = glm::max(0.005f, glm::distance(body->transform->position, hole->transform->position));
+				const float pull_strength = (hole_pull_strength_start*hole_scale*hole_scale/hole_dist);
+				std::cout << "Pull strength: " << pull_strength << '\n';
+				if (pull_strength >= min_pull_strength) {
+					body->force += glm::normalize(hole->transform->position - body->transform->position) * pull_strength * body->mass;
+				}
+			}
 
 			body->velocity += body->force / body->mass * elapsed;
 			body->transform->position += body->velocity * elapsed;
@@ -358,12 +366,12 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 		));
 
 		constexpr float H = 0.09f;
-		lines.draw_text("Mouse motion rotates camera; WASD moves; escape ungrabs mouse",
+		lines.draw_text("Mouse + WASD to move, LSHIFT to run. Look down + hold LMB to swing.",
 			glm::vec3(-aspect + 0.1f * H, -1.0 + 0.1f * H, 0.0),
 			glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
 			glm::u8vec4(0x00, 0x00, 0x00, 0x00));
 		float ofs = 2.0f / drawable_size.y;
-		lines.draw_text("Mouse motion rotates camera; WASD moves; escape ungrabs mouse",
+		lines.draw_text("Mouse + WASD to move, LSHIFT to run. Look down + hold LMB to swing.",
 			glm::vec3(-aspect + 0.1f * H + ofs, -1.0 + 0.1f * H + ofs, 0.0),
 			glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
 			glm::u8vec4(0xff, 0xff, 0xff, 0x00));
