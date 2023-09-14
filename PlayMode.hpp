@@ -61,7 +61,7 @@ struct PlayMode : Mode {
 
 	// physics
 	void handle_physics(float elapsed);
-	const glm::vec3 gravity = glm::vec3(0,0,-1.8f);//9.8f;
+	const glm::vec3 gravity = glm::vec3(0,0,-9.8f);//9.8f;
 	std::vector<Scene::CollisionObject*> collision_objects;
 
 };

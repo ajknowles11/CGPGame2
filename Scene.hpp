@@ -169,13 +169,14 @@ struct Scene {
 		const Collider *b, const Transform *tb);
 	
 	struct CollisionObject {
-		CollisionObject(Transform *transform_, Collider *collider_) : transform(transform_), collider(collider_) {
+		CollisionObject(Transform *transform_, Collider *collider_, float damp_ = 0.95) : transform(transform_), collider(collider_), damp(damp_) {
 			assert(transform); 
 			assert(collider);
 		}
 		Collider *collider = nullptr;
 		Transform * transform = nullptr;
 		bool is_dynamic = false;
+		float damp = 0.95f;
 	};
 
 	struct RigidBody : CollisionObject {

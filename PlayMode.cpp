@@ -45,7 +45,7 @@ PlayMode::PlayMode() : scene(*hexapod_scene) {
 		else if (transform.name == "Club") club = &transform;
 
 		else if (transform.name == "Ball") ball = new Scene::RigidBody(&transform, new Scene::SphereCollider(glm::vec3(0), 0.02135f));
-		else if (transform.name == "Ground") collision_objects.emplace_back(new Scene::CollisionObject(&transform, new Scene::PlaneCollider(glm::vec3(0,0,1.0f), 0)));
+		else if (transform.name == "Ground") collision_objects.emplace_back(new Scene::CollisionObject(&transform, new Scene::PlaneCollider(glm::vec3(0,0,1.0f), 0), 0.4f));
 	}
 
 	if (player == nullptr) throw std::runtime_error("Player not found.");
@@ -251,7 +251,7 @@ void PlayMode::handle_physics(float elapsed) {
 		if (!col.obj_a->is_dynamic && !col.obj_b->is_dynamic) continue;
 		else if (!col.obj_a->is_dynamic) { // b is moving
 			Scene::RigidBody *body_b = static_cast<Scene::RigidBody*>(col.obj_b);
-			glm::vec3 out_velocity = body_b->velocity - 2.0f * glm::dot(body_b->velocity, -col.points.normal) * -col.points.normal;\
+			glm::vec3 out_velocity = col.obj_a->damp * (body_b->velocity - 2.0f * glm::dot(body_b->velocity, -col.points.normal) * -col.points.normal);
 			glm::vec3 out_force = -glm::dot(body_b->mass * gravity, col.points.normal) * col.points.normal;
 			glm::vec3 out_dir = glm::normalize(out_velocity);
 			// move body_b back to where it hit
@@ -265,14 +265,14 @@ void PlayMode::handle_physics(float elapsed) {
 		}
 		else if (!col.obj_b->is_dynamic) { // a is moving
 			Scene::RigidBody *body_a = static_cast<Scene::RigidBody*>(col.obj_a);
-			glm::vec3 out_velocity = body_a->velocity - 2.0f * glm::dot(body_a->velocity, col.points.normal) * col.points.normal;
+			glm::vec3 out_velocity = col.obj_b->damp * (body_a->velocity - 2.0f * glm::dot(body_a->velocity, col.points.normal) * col.points.normal);
 			glm::vec3 out_force = -glm::dot(body_a->mass * gravity, col.points.normal) * col.points.normal;
 			glm::vec3 out_dir = glm::normalize(out_velocity);
 			// move body_a back to where it hit
 			glm::vec3 vel_dir = glm::normalize(body_a->velocity);
 			float angled_dist = col.points.depth / glm::dot(-col.points.normal, vel_dir);
 			body_a->transform->position = body_a->transform->position - vel_dir * angled_dist + out_dir * angled_dist;
-			
+
 			// apply new physics
 			body_a->velocity = out_velocity;
 			body_a->force = out_force;
