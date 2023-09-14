@@ -144,6 +144,12 @@ struct Scene {
 		float distance;
 	};
 
+	struct BoxCollider : Collider {
+		BoxCollider(glm::vec3 min_, glm::vec3 max_) : Collider(ColliderType::Box), min(min_), max(max_) { assert(glm::distance(max, min) > 0);}
+		glm::vec3 min;
+		glm::vec3 max;
+	};
+
 	struct CollisionPoints {
 		glm::vec3 a; // furthest point of a in b
 		glm::vec3 b; // furthest point of b in a

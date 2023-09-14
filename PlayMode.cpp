@@ -124,7 +124,7 @@ bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 			SDL_SetRelativeMouseMode(SDL_TRUE);
 			return true;
 		}
-		else if (evt.button.button == SDL_BUTTON_LEFT && !swinging) {
+		else if (evt.button.button == SDL_BUTTON_LEFT && !swinging && camera_pitch < cam_pitch_aim_start) {
 			backswinging = true;
 		}
 	} else if (evt.type == SDL_MOUSEBUTTONUP) {
@@ -291,7 +291,8 @@ void PlayMode::handle_physics(float elapsed) {
 			body_a->force = out_force;
 		}
 		else {
-			// nothing for now
+			// only happens for ball/hole right now
+			std::cout << "Won level" << '\n';
 		}
 	}
 
@@ -304,7 +305,6 @@ void PlayMode::handle_physics(float elapsed) {
 
 			body->velocity += body->force / body->mass * elapsed;
 			body->transform->position += body->velocity * elapsed;
-			std::cout << body->transform->name << ", " << body->force.x << ", " << body->force.y << ", " << body->force.z << "\n";
 
 			body->force = glm::vec3(0);
 		}

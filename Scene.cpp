@@ -380,24 +380,28 @@ Scene::CollisionPoints Scene::test_sphere_sphere(const Collider *a, const Transf
 	const SphereCollider* sp_a = static_cast<const SphereCollider*>(a);
 	const SphereCollider* sp_b = static_cast<const SphereCollider*>(b);
 
-	glm::mat4x3 a_world = ta->make_local_to_world();
-	glm::mat4x3 b_world = tb->make_local_to_world();
+	const glm::mat4x3 a_world = ta->make_local_to_world();
+	const glm::mat4x3 b_world = tb->make_local_to_world();
 
-	glm::vec3 a_center = a_world * glm::vec4(sp_a->center, 1);
-	glm::vec3 b_center = b_world * glm::vec4(sp_b->center, 1);
+	const glm::vec3 a_center = a_world * glm::vec4(sp_a->center, 1);
+	const glm::vec3 b_center = b_world * glm::vec4(sp_b->center, 1);
 
-	float a_radius = (a_world * glm::vec4(sp_a->radius,0,0,0)).x; //don't use non-uniform scaling PLEASE
-	float b_radius = (b_world * glm::vec4(sp_b->radius,0,0,0)).x;
+	if (a_center == b_center) {
+		return CollisionPoints();
+	}
+
+	const float a_radius = (a_world * glm::vec4(sp_a->radius,0,0,0)).x; //don't use non-uniform scaling PLEASE
+	const float b_radius = (b_world * glm::vec4(sp_b->radius,0,0,0)).x;
 
 	if (glm::distance(a_center, b_center) > a_radius + b_radius) return CollisionPoints();
 
-	glm::vec3 dir = a_center - b_center;
-	glm::vec3 normal = glm::normalize(dir);
+	const glm::vec3 dir = a_center - b_center;
+	const glm::vec3 normal = glm::normalize(dir);
 
-	glm::vec3 pt_a = -normal * a_radius;
-	glm::vec3 pt_b = normal * b_radius;
+	const glm::vec3 pt_a = -normal * a_radius;
+	const glm::vec3 pt_b = normal * b_radius;
 
-	float depth = glm::distance(pt_b, pt_a);
+	const float depth = glm::distance(pt_b, pt_a);
 
 	return CollisionPoints{pt_a, pt_b, normal, depth, true};
 }
@@ -406,30 +410,69 @@ Scene::CollisionPoints Scene::test_sphere_plane(const Collider *a, const Transfo
 	const SphereCollider* sp_a = static_cast<const SphereCollider*>(a);
 	const PlaneCollider* p_b = static_cast<const PlaneCollider*>(b);
 
-	glm::mat4x3 a_world = ta->make_local_to_world();
-	glm::mat4x3 b_world = tb->make_local_to_world();
+	const glm::mat4x3 a_world = ta->make_local_to_world();
+	const glm::mat4x3 b_world = tb->make_local_to_world();
 
-	glm::vec3 a_center = a_world * glm::vec4(sp_a->center, 1);
-	float a_radius = (a_world * glm::vec4(sp_a->radius,0,0,0)).x; //again this assumes uniform scaling
+	const glm::vec3 a_center = a_world * glm::vec4(sp_a->center, 1);
+	const float a_radius = (a_world * glm::vec4(sp_a->radius,0,0,0)).x; //again this assumes uniform scaling
 
-	glm::vec3 normal = glm::normalize(b_world * glm::vec4(p_b->normal, 0));
-	glm::vec3 b_distance = b_world * glm::vec4(normal * p_b->distance, 0);
+	const glm::vec3 normal = glm::normalize(b_world * glm::vec4(p_b->normal, 0));
+	const glm::vec3 b_distance = b_world * glm::vec4(normal * p_b->distance, 0);
 
-	float distance = glm::dot(a_center - b_distance, normal);
+	const float distance = glm::dot(a_center - b_distance, normal);
 
 	if (distance > a_radius) {
 		return CollisionPoints();
 	}
 
-	glm::vec3 pt_a = a_center - normal * a_radius;
-	glm::vec3 pt_b = a_center - normal * distance;
-	float depth = glm::distance(pt_b, pt_a);
+	const glm::vec3 pt_a = a_center - normal * a_radius;
+	const glm::vec3 pt_b = a_center - normal * distance;
+	const float depth = glm::distance(pt_b, pt_a);
 
 	return CollisionPoints{pt_a, pt_b, normal, depth, true};
 }
 
 Scene::CollisionPoints Scene::test_sphere_box(const Collider *a, const Transform *ta, const Collider *b, const Transform *tb) {
-	return CollisionPoints();
+	const SphereCollider* sp_a = static_cast<const SphereCollider*>(a);
+	const BoxCollider* b_b = static_cast<const BoxCollider*>(b);
+
+	// we convert a to b space because it allows us to use non-axis-aligned boxes while keeping code a bit easier
+	// algo from Mozilla docs: https://developer.mozilla.org/en-US/docs/Games/Techniques/3D_collision_detection
+	const glm::mat4x3 a_local_to_b = tb->make_world_to_local() * glm::mat4(ta->make_local_to_world());
+
+	const glm::vec3 a_center = a_local_to_b * glm::vec4(sp_a->center, 1);
+	const float a_radius = (a_local_to_b * glm::vec4(sp_a->radius,0,0,0)).x; // uniform scale again
+
+	const glm::vec3 b_center = glm::mix(b_b->min, b_b->max, 0.5f);
+	if (a_center == b_center) {
+		return CollisionPoints();
+	}
+
+	// get closest box pt to sphere center
+	// this is kinda like clamping? but I don't think glm::clamp exactly works here (without some finagling)
+	const float close_x = glm::max(b_b->min.x, glm::min(a_center.x, b_b->max.x));
+	const float close_y = glm::max(b_b->min.y, glm::min(a_center.y, b_b->max.y));
+	const float close_z = glm::max(b_b->min.z, glm::min(a_center.z, b_b->max.z));
+
+	const glm::vec3 pt_b = glm::vec3(close_x, close_y, close_z);
+
+	if (glm::distance(pt_b, a_center) > a_radius) {
+		return CollisionPoints();
+	}
+
+	glm::vec3 pt_a;
+	if (glm::distance(b_center, a_center) <= a_radius) {
+		pt_a = b_center;
+	}
+	else {
+		const glm::vec3 to_b_center = glm::normalize(b_center - a_center);
+		pt_a = a_center + to_b_center * a_radius;
+	}
+
+	const glm::vec3 normal = glm::normalize(pt_b - pt_a);
+	const float depth = glm::length(normal);
+
+	return CollisionPoints{pt_a, pt_b, normal, depth, true};
 }
 
 Scene::CollisionPoints Scene::test_collision(const Collider *a, const Transform *ta, const Collider *b, const Transform *tb) {
@@ -441,7 +484,7 @@ Scene::CollisionPoints Scene::test_collision(const Collider *a, const Transform 
 			return test_sphere_plane(a, ta, b, tb);
 		}
 		if (b->type == ColliderType::Box) {
-			// return test_sphere_box(a, ta, b, tb);
+			return test_sphere_box(a, ta, b, tb);
 		}
 	}
 	if (b->type == ColliderType::Sphere) {
@@ -449,7 +492,7 @@ Scene::CollisionPoints Scene::test_collision(const Collider *a, const Transform 
 			return test_sphere_plane(b, tb, a, ta);
 		}
 		if (a->type == ColliderType::Box) {
-			// return test_sphere_box(b, tb, a, ta);
+			return test_sphere_box(b, tb, a, ta);
 		}
 	}
 	// we only deal with sphere-related collisions
