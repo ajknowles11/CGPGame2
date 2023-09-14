@@ -161,7 +161,9 @@ struct Scene {
 		const Collider *a, const Transform *ta,
 		const Collider *b, const Transform *tb);
 
-	// sphere box
+	static CollisionPoints test_sphere_box(
+		const Collider *a, const Transform *ta,
+		const Collider *b, const Transform *tb);
 
 	// generic func that calls the appropriate specific test func
 	static CollisionPoints test_collision(

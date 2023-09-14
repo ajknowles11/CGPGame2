@@ -12,23 +12,23 @@
 
 #include <random>
 
-GLuint hexapod_meshes_for_lit_color_texture_program = 0;
-Load< MeshBuffer > hexapod_meshes(LoadTagDefault, []() -> MeshBuffer const * {
+GLuint level_meshes_for_lit_color_texture_program = 0;
+Load< MeshBuffer > level_meshes(LoadTagDefault, []() -> MeshBuffer const * {
 	MeshBuffer const *ret = new MeshBuffer(data_path("lvl1.pnct"));
-	hexapod_meshes_for_lit_color_texture_program = ret->make_vao_for_program(lit_color_texture_program->program);
+	level_meshes_for_lit_color_texture_program = ret->make_vao_for_program(lit_color_texture_program->program);
 	return ret;
 });
 
-Load< Scene > hexapod_scene(LoadTagDefault, []() -> Scene const * {
+Load< Scene > level_scene(LoadTagDefault, []() -> Scene const * {
 	return new Scene(data_path("lvl1.scene"), [&](Scene &scene, Scene::Transform *transform, std::string const &mesh_name){
-		Mesh const &mesh = hexapod_meshes->lookup(mesh_name);
+		Mesh const &mesh = level_meshes->lookup(mesh_name);
 
 		scene.drawables.emplace_back(transform);
 		Scene::Drawable &drawable = scene.drawables.back();
 
 		drawable.pipeline = lit_color_texture_program_pipeline;
 
-		drawable.pipeline.vao = hexapod_meshes_for_lit_color_texture_program;
+		drawable.pipeline.vao = level_meshes_for_lit_color_texture_program;
 		drawable.pipeline.type = mesh.type;
 		drawable.pipeline.start = mesh.start;
 		drawable.pipeline.count = mesh.count;
@@ -36,7 +36,7 @@ Load< Scene > hexapod_scene(LoadTagDefault, []() -> Scene const * {
 	});
 });
 
-PlayMode::PlayMode() : scene(*hexapod_scene) {
+PlayMode::PlayMode() : scene(*level_scene) {
 
 	for (auto &transform : scene.transforms) {
 		if (transform.name == "Player") player = &transform;
@@ -58,20 +58,6 @@ PlayMode::PlayMode() : scene(*hexapod_scene) {
 
 	collision_objects.emplace_back(ball);
 	ball->transform->position += glm::vec3(0,0,1);
-
-	// //get pointers to leg for convenience:
-	// for (auto &transform : scene.transforms) {
-	// 	if (transform.name == "Hip.FL") hip = &transform;
-	// 	else if (transform.name == "UpperLeg.FL") upper_leg = &transform;
-	// 	else if (transform.name == "LowerLeg.FL") lower_leg = &transform;
-	// }
-	// if (hip == nullptr) throw std::runtime_error("Hip not found.");
-	// if (upper_leg == nullptr) throw std::runtime_error("Upper leg not found.");
-	// if (lower_leg == nullptr) throw std::runtime_error("Lower leg not found.");
-
-	// hip_base_rotation = hip->rotation;
-	// upper_leg_base_rotation = upper_leg->rotation;
-	// lower_leg_base_rotation = lower_leg->rotation;
 
 	//get pointer to camera for convenience:
 	if (scene.cameras.size() != 1) throw std::runtime_error("Expecting scene to have exactly one camera, but it has " + std::to_string(scene.cameras.size()));
@@ -159,23 +145,6 @@ bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 void PlayMode::update(float elapsed) {
 	fps = 1.0f / elapsed;
 
-	// //slowly rotates through [0,1):
-	// wobble += elapsed / 10.0f;
-	// wobble -= std::floor(wobble);
-
-	// hip->rotation = hip_base_rotation * glm::angleAxis(
-	// 	glm::radians(5.0f * std::sin(wobble * 2.0f * float(M_PI))),
-	// 	glm::vec3(0.0f, 1.0f, 0.0f)
-	// );
-	// upper_leg->rotation = upper_leg_base_rotation * glm::angleAxis(
-	// 	glm::radians(7.0f * std::sin(wobble * 2.0f * 2.0f * float(M_PI))),
-	// 	glm::vec3(0.0f, 0.0f, 1.0f)
-	// );
-	// lower_leg->rotation = lower_leg_base_rotation * glm::angleAxis(
-	// 	glm::radians(10.0f * std::sin(wobble * 3.0f * 2.0f * float(M_PI))),
-	// 	glm::vec3(0.0f, 0.0f, 1.0f)
-	// );
-
 	//move player:
 	{
 
@@ -215,6 +184,7 @@ void PlayMode::update(float elapsed) {
 	}
 
 	// handle physics, thanks Winterdev (https://www.youtube.com/watch?v=-_IspRG548E)
+	// and https://winter.dev/articles/physics-engine
 	handle_physics(elapsed);
 
 	//reset button press counters:
@@ -252,7 +222,7 @@ void PlayMode::handle_physics(float elapsed) {
 		else if (!col.obj_a->is_dynamic) { // b is moving
 			Scene::RigidBody *body_b = static_cast<Scene::RigidBody*>(col.obj_b);
 			glm::vec3 out_velocity = col.obj_a->damp * (body_b->velocity - 2.0f * glm::dot(body_b->velocity, -col.points.normal) * -col.points.normal);
-			glm::vec3 out_force = -glm::dot(body_b->mass * gravity, col.points.normal) * col.points.normal;
+			glm::vec3 out_force = body_b->mass * gravity - 2.0f * -glm::dot(body_b->mass * gravity, col.points.normal) * col.points.normal;
 			glm::vec3 out_dir = glm::normalize(out_velocity);
 			// move body_b back to where it hit
 			glm::vec3 vel_dir = glm::normalize(body_b->velocity);
@@ -266,7 +236,7 @@ void PlayMode::handle_physics(float elapsed) {
 		else if (!col.obj_b->is_dynamic) { // a is moving
 			Scene::RigidBody *body_a = static_cast<Scene::RigidBody*>(col.obj_a);
 			glm::vec3 out_velocity = col.obj_b->damp * (body_a->velocity - 2.0f * glm::dot(body_a->velocity, col.points.normal) * col.points.normal);
-			glm::vec3 out_force = -glm::dot(body_a->mass * gravity, col.points.normal) * col.points.normal;
+			glm::vec3 out_force = body_a->mass * gravity - 2.0f * -glm::dot(body_a->mass * gravity, col.points.normal) * col.points.normal;
 			glm::vec3 out_dir = glm::normalize(out_velocity);
 			// move body_a back to where it hit
 			glm::vec3 vel_dir = glm::normalize(body_a->velocity);

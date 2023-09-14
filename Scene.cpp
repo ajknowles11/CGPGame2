@@ -424,10 +424,13 @@ Scene::CollisionPoints Scene::test_sphere_plane(const Collider *a, const Transfo
 	glm::vec3 pt_a = a_center - normal * a_radius;
 	glm::vec3 pt_b = a_center - normal * distance;
 	float depth = glm::distance(pt_b, pt_a);
-	
+
 	return CollisionPoints{pt_a, pt_b, normal, depth, true};
 }
 
+Scene::CollisionPoints Scene::test_sphere_box(const Collider *a, const Transform *ta, const Collider *b, const Transform *tb) {
+	
+}
 
 Scene::CollisionPoints Scene::test_collision(const Collider *a, const Transform *ta, const Collider *b, const Transform *tb) {
 	if (a->type == ColliderType::Sphere) {
