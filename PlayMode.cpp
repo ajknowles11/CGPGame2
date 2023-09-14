@@ -469,16 +469,6 @@ void PlayMode::handle_physics(float elapsed) {
 		}
 	}
 
-	// remove dead pickups
-	// quick deletion from so: https://stackoverflow.com/questions/4713131/removing-item-from-vector-while-iterating
-	if (delete_count > 0) {
-		for (uint8_t i = 0; i < collision_objects.size(); i++) {
-			while (i < collision_objects.size() && collision_objects[i]->to_delete) {
-				collision_objects.erase(collision_objects.begin() + i);
-			}
-		}
-	}
-
 	// move dynamics
 	for (auto obj : collision_objects) {
 		if (obj->is_dynamic) {

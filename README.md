@@ -14,4 +14,6 @@ WASD and mouse for move/look. If you look down, you can click left mouse button 
 
 There are three levels built in and they just loop once you finish. ESC to release mouse.
 
+NOTE: There's a bug on level 3 which sometimes causes the ball to disappear. If this happens just press R. It doesn't seem to happen more than once per game instance.
+
 This game was built with [NEST](NEST.md).
