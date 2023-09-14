@@ -452,12 +452,11 @@ Scene::CollisionPoints Scene::test_sphere_box(const Collider *a, const Transform
 
 	const glm::vec3 pt_b = b_local_to_world * glm::vec4(close_x, close_y, close_z,1);
 
-	if (glm::distance(pt_b, a_center) > a_radius) {
-		return CollisionPoints();
-	}
-
 	const glm::vec3 a_center_world = b_local_to_world * glm::vec4(a_center,1);
 	const float a_radius_world = (b_local_to_world * glm::vec4(a_radius,0,0,0)).x;
+	if (glm::distance(pt_b, a_center_world) > a_radius_world) {
+		return CollisionPoints();
+	}
 
 	const glm::vec3 normal = glm::normalize(a_center_world - pt_b);
 	const glm::vec3 pt_a = a_center_world - a_radius_world * normal;
