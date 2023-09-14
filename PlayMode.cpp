@@ -13,15 +13,16 @@
 #include <random>
 
 GLuint level_meshes_for_lit_color_texture_program = 0;
-Load< MeshBuffer > level_meshes(LoadTagDefault, []() -> MeshBuffer const * {
-	MeshBuffer const *ret = new MeshBuffer(data_path("levels/lvl2.pnct"));
+
+Load< MeshBuffer > level1_meshes(LoadTagDefault, []() -> MeshBuffer const * {
+	MeshBuffer const *ret = new MeshBuffer(data_path("levels/lvl1.pnct"));
 	level_meshes_for_lit_color_texture_program = ret->make_vao_for_program(lit_color_texture_program->program);
 	return ret;
 });
 
-Load< Scene > level_scene(LoadTagDefault, []() -> Scene const * {
-	return new Scene(data_path("levels/lvl2.scene"), [&](Scene &scene, Scene::Transform *transform, std::string const &mesh_name){
-		Mesh const &mesh = level_meshes->lookup(mesh_name);
+Load< Scene > level1_scene(LoadTagDefault, []() -> Scene const * {
+	return new Scene(data_path("levels/lvl1.scene"), [&](Scene &scene, Scene::Transform *transform, std::string const &mesh_name){
+		Mesh const &mesh = level1_meshes->lookup(mesh_name);
 
 		scene.drawables.emplace_back(transform);
 		Scene::Drawable &drawable = scene.drawables.back();
@@ -36,22 +37,62 @@ Load< Scene > level_scene(LoadTagDefault, []() -> Scene const * {
 	});
 });
 
-PlayMode::PlayMode() : scene(*level_scene) {
+Load< MeshBuffer > level2_meshes(LoadTagDefault, []() -> MeshBuffer const * {
+	MeshBuffer const *ret = new MeshBuffer(data_path("levels/lvl2.pnct"));
+	level_meshes_for_lit_color_texture_program = ret->make_vao_for_program(lit_color_texture_program->program);
+	return ret;
+});
 
+Load< Scene > level2_scene(LoadTagDefault, []() -> Scene const * {
+	return new Scene(data_path("levels/lvl2.scene"), [&](Scene &scene, Scene::Transform *transform, std::string const &mesh_name){
+		Mesh const &mesh = level2_meshes->lookup(mesh_name);
+
+		scene.drawables.emplace_back(transform);
+		Scene::Drawable &drawable = scene.drawables.back();
+
+		drawable.pipeline = lit_color_texture_program_pipeline;
+
+		drawable.pipeline.vao = level_meshes_for_lit_color_texture_program;
+		drawable.pipeline.type = mesh.type;
+		drawable.pipeline.start = mesh.start;
+		drawable.pipeline.count = mesh.count;
+
+	});
+});
+
+std::vector< Load <MeshBuffer> > level_meshes_vec;
+std::vector< Load <Scene> > scene_vec;
+
+PlayMode::PlayMode() {
+	level_meshes_vec.emplace_back(level1_meshes);
+	scene_vec.emplace_back(level1_scene);
+	
+	level_meshes_vec.emplace_back(level2_meshes);
+	scene_vec.emplace_back(level2_scene);
+
+
+	init();
+}
+
+PlayMode::~PlayMode() {
+}
+
+void PlayMode::init() {
+	scene = *scene_vec[lvl_index];
 	for (auto &transform : scene.transforms) {
 		if (transform.name == "Player") player = &transform;
 		else if (transform.name == "Hand") hand = &transform;
 		else if (transform.name == "AimHand") aimhand = &transform;
 		else if (transform.name == "Club") club = &transform;
 
-		else if (transform.name == "Hole") hole = new Scene::RigidBody(&transform, new Scene::SphereCollider(glm::vec3(0), hole_radius_start));
+		else if (transform.name == "Hole") hole = std::make_shared<Scene::RigidBody>(&transform, std::make_shared<Scene::SphereCollider>(glm::vec3(0), hole_radius_start));
 
-		else if (transform.name == "Ball") ball = new Scene::RigidBody(&transform, new Scene::SphereCollider(glm::vec3(0), ball_radius_start));
-		else if (transform.name == "Ground") collision_objects.emplace_back(new Scene::CollisionObject(&transform, new Scene::PlaneCollider(glm::vec3(0,0,1.0f), 0), 0.7f));
+		else if (transform.name == "Ball") ball = std::make_shared<Scene::RigidBody>(&transform, std::make_shared<Scene::SphereCollider>(glm::vec3(0), ball_radius_start));
+		else if (transform.name == "Ground") collision_objects.emplace_back(std::make_shared<Scene::CollisionObject>(&transform, std::make_shared<Scene::PlaneCollider>(glm::vec3(0,0,1.0f), 0.0f), 0.7f));
 
 		else if (transform.name.substr(0, 4) == "Wall"){
-			const Mesh &mesh = level_meshes->lookup(transform.name);
-			collision_objects.emplace_back(new Scene::CollisionObject(&transform, new Scene::BoxCollider(mesh.min, mesh.max)));
+			const Mesh &mesh = level_meshes_vec[lvl_index]->lookup(transform.name);
+			collision_objects.emplace_back(std::make_shared<Scene::CollisionObject>(&transform, std::make_shared<Scene::BoxCollider>(mesh.min, mesh.max)));
 		}
 	}
 
@@ -72,12 +113,51 @@ PlayMode::PlayMode() : scene(*level_scene) {
 	//get pointer to camera for convenience:
 	if (scene.cameras.size() != 1) throw std::runtime_error("Expecting scene to have exactly one camera, but it has " + std::to_string(scene.cameras.size()));
 	camera = &scene.cameras.front();
+
+	loading = false;
 }
 
-PlayMode::~PlayMode() {
+void PlayMode::cleanup_go_next() {
+	loading = true;
+
+	swing_acc = 0;
+	swing_power = 0;
+	backswinging = false;
+	swinging = false;
+	should_swing = false;
+
+	hole_scale = 1.0f;
+	player = nullptr;
+	camera = nullptr;
+
+	camera_pitch = glm::pi<float>()/2;
+	is_sprinting = false;
+	
+	hand = nullptr;
+	aimhand = nullptr;
+	club = nullptr;
+
+	collision_objects = std::vector<std::shared_ptr<Scene::CollisionObject>>();
+
+	if (++lvl_index < level_meshes_vec.size()) {
+		init();
+	}
+	else {
+		return;
+	}
 }
 
 bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size) {
+
+	if (loading) {
+		if (evt.type == SDL_KEYDOWN) {
+			if (evt.key.keysym.sym == SDLK_ESCAPE) {
+				SDL_SetRelativeMouseMode(SDL_FALSE);
+				return true;
+			}
+		}
+		return false;
+	}
 
 	if (evt.type == SDL_KEYDOWN) {
 		if (evt.key.keysym.sym == SDLK_ESCAPE) {
@@ -101,12 +181,16 @@ bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 			return true;
 		} else if (evt.key.keysym.sym == SDLK_LSHIFT) {
 			is_sprinting = true;
+			return true;
 		} else if (evt.key.keysym.sym == SDLK_F3) {
 			show_fps = !show_fps;
+			return true;
 		} else if (show_fps && evt.key.keysym.sym == SDLK_DOWN) {
 			player->position.z -= 0.2f;
+			return true;
 		} else if (show_fps && evt.key.keysym.sym == SDLK_UP) {
 			player->position.z += 0.2f;
+			return true;
 		}
 	} else if (evt.type == SDL_KEYUP) {
 		if (evt.key.keysym.sym == SDLK_a) {
@@ -123,6 +207,7 @@ bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 			return true;
 		} else if (evt.key.keysym.sym == SDLK_LSHIFT) {
 			is_sprinting = false;
+			return true;
 		}
 	} else if (evt.type == SDL_MOUSEBUTTONDOWN) {
 		if (SDL_GetRelativeMouseMode() == SDL_FALSE) {
@@ -131,12 +216,14 @@ bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 		}
 		else if (evt.button.button == SDL_BUTTON_LEFT && !swinging && camera_pitch < cam_pitch_aim_start) {
 			backswinging = true;
+			return true;
 		}
 	} else if (evt.type == SDL_MOUSEBUTTONUP) {
 		if (evt.button.button == SDL_BUTTON_LEFT && backswinging) {
 			backswinging = false;
 			swinging = true;
 			should_swing = true;
+			return true;
 		}
 	}
 	else if (evt.type == SDL_MOUSEMOTION) {
@@ -163,6 +250,7 @@ bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 }
 
 void PlayMode::update(float elapsed) {
+	if (loading) return;
 	fps = 1.0f / elapsed;
 
 	//move player:
@@ -238,6 +326,11 @@ void PlayMode::update(float elapsed) {
 	right.downs = 0;
 	up.downs = 0;
 	down.downs = 0;
+
+	if (cleanup_next_update) {
+		cleanup_next_update = false;
+		cleanup_go_next();
+	}
 }
 
 void PlayMode::handle_physics(float elapsed) {
@@ -266,7 +359,7 @@ void PlayMode::handle_physics(float elapsed) {
 	for (auto col : collisions) {
 		if (!col.obj_a->is_dynamic && !col.obj_b->is_dynamic) continue;
 		else if (!col.obj_a->is_dynamic) { // b is moving
-			Scene::RigidBody *body_b = static_cast<Scene::RigidBody*>(col.obj_b);
+			std::shared_ptr<Scene::RigidBody> body_b = std::static_pointer_cast<Scene::RigidBody>(col.obj_b);
 			if (glm::length(body_b->velocity) < 0.00001f) return;
 			glm::vec3 out_velocity = col.obj_b->friction * (body_b->velocity - 2.0f * col.obj_a->damp * glm::dot(body_b->velocity, -col.points.normal) * -col.points.normal);
 			glm::vec3 out_force = body_b->mass * gravity - 2.0f * glm::dot(body_b->mass * gravity, col.points.normal) * col.points.normal;
@@ -281,7 +374,7 @@ void PlayMode::handle_physics(float elapsed) {
 			body_b->force = out_force;
 		}
 		else if (!col.obj_b->is_dynamic) { // a is moving
-			Scene::RigidBody *body_a = static_cast<Scene::RigidBody*>(col.obj_a);
+			std::shared_ptr<Scene::RigidBody> body_a = std::static_pointer_cast<Scene::RigidBody>(col.obj_a);
 			if (glm::length(body_a->velocity) < 0.00001f) return;
 			glm::vec3 out_velocity = col.obj_b->friction * (body_a->velocity - 2.0f * col.obj_b->damp * glm::dot(body_a->velocity, col.points.normal) * col.points.normal);
 			glm::vec3 out_force = body_a->mass * gravity - 2.0f * glm::dot(body_a->mass * gravity, -col.points.normal) * col.points.normal;
@@ -297,14 +390,15 @@ void PlayMode::handle_physics(float elapsed) {
 		}
 		else {
 			// only happens for ball/hole right now
-			std::cout << "Won level" << '\n';
+			// win level
+			cleanup_next_update = true;
 		}
 	}
 
 	// move dynamics
 	for (auto obj : collision_objects) {
 		if (obj->is_dynamic) {
-			Scene::RigidBody *body = static_cast<Scene::RigidBody*>(obj);
+			std::shared_ptr<Scene::RigidBody> body = std::static_pointer_cast<Scene::RigidBody>(obj);
 			body->force += body->mass * gravity;
 			body->force += -body->velocity * drag;
 			if (body->transform->name == "Ball") {
@@ -328,13 +422,14 @@ void PlayMode::swing() {
 	should_swing = false;
 	const glm::vec3 hole_pos = hole->transform->make_local_to_world() * glm::vec4(0,0,0,1);
 	const float dist = glm::distance(hole_pos, player->position);
-	std::cout << dist << '\n';
+	
 	if (swing_power > 0 && dist <= hit_radius + hole_radius_start * hole_scale) {//can hit hole here
 		hole->velocity += hole->mass * swing_power/swing_max * player->make_local_to_world() * glm::vec4(-max_hit_velocity,0,0,0);
 	}
 }
 
 void PlayMode::draw(glm::uvec2 const &drawable_size) {
+	if (loading) return;
 	//update camera aspect ratio for drawable:
 	camera->aspect = float(drawable_size.x) / float(drawable_size.y);
 

@@ -376,9 +376,9 @@ void Scene::set(Scene const &other, std::unordered_map< Transform const *, Trans
 	}
 }
 
-Scene::CollisionPoints Scene::test_sphere_sphere(const Collider *a, const Transform *ta, const Collider *b, const Transform *tb) {
-	const SphereCollider* sp_a = static_cast<const SphereCollider*>(a);
-	const SphereCollider* sp_b = static_cast<const SphereCollider*>(b);
+Scene::CollisionPoints Scene::test_sphere_sphere(std::shared_ptr<Collider> a, const Transform *ta, std::shared_ptr<Collider> b, const Transform *tb) {
+	std::shared_ptr<const SphereCollider> sp_a = std::static_pointer_cast<const SphereCollider>(a);
+	std::shared_ptr<const SphereCollider> sp_b = std::static_pointer_cast<const SphereCollider>(b);
 
 	const glm::mat4x3 a_world = ta->make_local_to_world();
 	const glm::mat4x3 b_world = tb->make_local_to_world();
@@ -406,9 +406,9 @@ Scene::CollisionPoints Scene::test_sphere_sphere(const Collider *a, const Transf
 	return CollisionPoints{pt_a, pt_b, normal, depth, true};
 }
 
-Scene::CollisionPoints Scene::test_sphere_plane(const Collider *a, const Transform *ta, const Collider *b, const Transform *tb) {
-	const SphereCollider* sp_a = static_cast<const SphereCollider*>(a);
-	const PlaneCollider* p_b = static_cast<const PlaneCollider*>(b);
+Scene::CollisionPoints Scene::test_sphere_plane(std::shared_ptr<Collider> a, const Transform *ta, std::shared_ptr<Collider> b, const Transform *tb) {
+	std::shared_ptr<const SphereCollider> sp_a = std::static_pointer_cast<const SphereCollider>(a);
+	std::shared_ptr<const PlaneCollider> p_b = std::static_pointer_cast<const PlaneCollider>(b);
 
 	const glm::mat4x3 a_world = ta->make_local_to_world();
 	const glm::mat4x3 b_world = tb->make_local_to_world();
@@ -432,9 +432,9 @@ Scene::CollisionPoints Scene::test_sphere_plane(const Collider *a, const Transfo
 	return CollisionPoints{pt_a, pt_b, normal, depth, true};
 }
 
-Scene::CollisionPoints Scene::test_sphere_box(const Collider *a, const Transform *ta, const Collider *b, const Transform *tb) {
-	const SphereCollider* sp_a = static_cast<const SphereCollider*>(a);
-	const BoxCollider* b_b = static_cast<const BoxCollider*>(b);
+Scene::CollisionPoints Scene::test_sphere_box(std::shared_ptr<Collider> a, const Transform *ta, std::shared_ptr<Collider> b, const Transform *tb) {
+	std::shared_ptr<const SphereCollider> sp_a = std::static_pointer_cast<const SphereCollider>(a);
+	std::shared_ptr<const BoxCollider> b_b = std::static_pointer_cast<const BoxCollider>(b);
 
 	// we convert a to b space because it allows us to use non-axis-aligned boxes while keeping code a bit easier
 	// algo from Mozilla docs: https://developer.mozilla.org/en-US/docs/Games/Techniques/3D_collision_detection
@@ -466,7 +466,7 @@ Scene::CollisionPoints Scene::test_sphere_box(const Collider *a, const Transform
 	return CollisionPoints{pt_a, pt_b, normal, depth, true};
 }
 
-Scene::CollisionPoints Scene::test_collision(const Collider *a, const Transform *ta, const Collider *b, const Transform *tb) {
+Scene::CollisionPoints Scene::test_collision(std::shared_ptr<Collider> a, const Transform *ta, std::shared_ptr<Collider> b, const Transform *tb) {
 	if (a->type == ColliderType::Sphere) {
 		if (b->type == ColliderType::Sphere) {
 			return test_sphere_sphere(a, ta, b, tb);

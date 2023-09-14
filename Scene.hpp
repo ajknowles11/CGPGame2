@@ -129,23 +129,27 @@ struct Scene {
 	
 	struct Collider {
 		Collider(ColliderType type_) : type(type_) {}
+		virtual ~Collider() {}
 		ColliderType type;
 	};
 
 	struct SphereCollider : Collider {
 		SphereCollider(glm::vec3 center_, float radius_) : Collider(ColliderType::Sphere), center(center_), radius(radius_) {}
+		~SphereCollider() {}
 		glm::vec3 center;
 		float radius;
 	};
 
 	struct PlaneCollider : Collider {
 		PlaneCollider(glm::vec3 normal_, float distance_) : Collider(ColliderType::Plane), normal(normal_), distance(distance_) {}
+		~PlaneCollider() {}
 		glm::vec3 normal;
 		float distance;
 	};
 
 	struct BoxCollider : Collider {
 		BoxCollider(glm::vec3 min_, glm::vec3 max_) : Collider(ColliderType::Box), min(min_), max(max_) { assert(glm::distance(max, min) > 0);}
+		~BoxCollider() {}
 		glm::vec3 min;
 		glm::vec3 max;
 	};
@@ -160,33 +164,35 @@ struct Scene {
 
 	// collision test functions
 	static CollisionPoints test_sphere_sphere(
-		const Collider *a, const Transform *ta,
-		const Collider *b, const Transform *tb);
+		std::shared_ptr<Collider> a, const Transform *ta,
+		std::shared_ptr<Collider> b, const Transform *tb);
 
 	static CollisionPoints test_sphere_plane(
-		const Collider *a, const Transform *ta,
-		const Collider *b, const Transform *tb);
+		std::shared_ptr<Collider> a, const Transform *ta,
+		std::shared_ptr<Collider> b, const Transform *tb);
 
 	static CollisionPoints test_sphere_box(
-		const Collider *a, const Transform *ta,
-		const Collider *b, const Transform *tb);
+		std::shared_ptr<Collider> a, const Transform *ta,
+		std::shared_ptr<Collider> b, const Transform *tb);
 
 	// generic func that calls the appropriate specific test func
 	static CollisionPoints test_collision(
-		const Collider *a, const Transform *ta,
-		const Collider *b, const Transform *tb);
+		std::shared_ptr<Collider> a, const Transform *ta,
+		std::shared_ptr<Collider> b, const Transform *tb);
 	
 	struct CollisionObject {
-		CollisionObject(Transform *transform_, Collider *collider_, float damp_ = 0.95) : transform(transform_), collider(collider_), damp(damp_) {
+		CollisionObject(Transform *transform_, std::shared_ptr<Collider> collider_, float damp_ = 0.95) : transform(transform_), collider(collider_), damp(damp_) {
 			assert(transform); 
 			assert(collider);
 		}
-		CollisionObject(Transform *transform_, Collider *collider_, bool is_pickup_) : transform(transform_), collider(collider_), is_pickup(is_pickup_) {
+		CollisionObject(Transform *transform_, std::shared_ptr<Collider> collider_, bool is_pickup_) : transform(transform_), collider(collider_), is_pickup(is_pickup_) {
 			assert(transform); 
 			assert(collider);
+		}
+		virtual ~CollisionObject() {
 		}
 		Transform * transform = nullptr;
-		Collider *collider = nullptr;
+		std::shared_ptr<Collider> collider = nullptr;
 		bool is_dynamic = false;
 		float damp = 0.95f;
 		float friction = 0.996f;
@@ -194,8 +200,10 @@ struct Scene {
 	};
 
 	struct RigidBody : CollisionObject {
-		RigidBody(Transform *transform_, Collider *collider_) : CollisionObject(transform_, collider_) {
+		RigidBody(Transform *transform_, std::shared_ptr<Collider> collider_) : CollisionObject(transform_, collider_) {
 			is_dynamic = true; 
+		}
+		~RigidBody() {
 		}
 		glm::vec3 velocity = glm::vec3(0);
 		glm::vec3 force = glm::vec3(0);
@@ -204,9 +212,10 @@ struct Scene {
 	};
 
 	struct Collision {
-		Collision(CollisionObject *a, CollisionObject *b, CollisionPoints p) : obj_a(a), obj_b(b), points(p) {}
-		CollisionObject *obj_a;
-		CollisionObject *obj_b;
+		Collision(std::shared_ptr<CollisionObject> a, std::shared_ptr<CollisionObject> b, CollisionPoints p) : obj_a(a), obj_b(b), points(p) {}
+		~Collision() {}
+		std::shared_ptr<CollisionObject> obj_a;
+		std::shared_ptr<CollisionObject> obj_b;
 		CollisionPoints points;
 	};
 

@@ -11,6 +11,12 @@ struct PlayMode : Mode {
 	PlayMode();
 	virtual ~PlayMode();
 
+	void init();
+	uint8_t lvl_index;
+	void cleanup_go_next();
+	bool loading = true;
+	bool cleanup_next_update = false;
+
 	//functions called by main loop:
 	virtual bool handle_event(SDL_Event const &, glm::uvec2 const &window_size) override;
 	virtual void update(float elapsed) override;
@@ -67,14 +73,14 @@ struct PlayMode : Mode {
 	Scene::Transform *hand = nullptr;
 	Scene::Transform *aimhand = nullptr;
 	Scene::Transform *club = nullptr;
-	Scene::RigidBody *ball = nullptr;
-	Scene::RigidBody *hole = nullptr;
+	std::shared_ptr<Scene::RigidBody> ball = nullptr;
+	std::shared_ptr<Scene::RigidBody> hole = nullptr;
 
-	float drag = 0.3f;
+	const float drag = 0.3f;
 
 	// physics
 	void handle_physics(float elapsed);
 	const glm::vec3 gravity = glm::vec3(0,0,-9.8f);
-	std::vector<Scene::CollisionObject*> collision_objects;
+	std::vector<std::shared_ptr<Scene::CollisionObject>> collision_objects;
 
 };
