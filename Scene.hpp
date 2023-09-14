@@ -181,8 +181,8 @@ struct Scene {
 			assert(transform); 
 			assert(collider);
 		}
-		Collider *collider = nullptr;
 		Transform * transform = nullptr;
+		Collider *collider = nullptr;
 		bool is_dynamic = false;
 		float damp = 0.95f;
 		float friction = 0.996f;
