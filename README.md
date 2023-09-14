@@ -12,8 +12,8 @@ How To Play:
 
 WASD and mouse for move/look. If you look down, you can click left mouse button and release to swing, with more power based on how long you hold. You need to be standing over the black hole to hit it. Also, shift to run and R to restart level ("penalty stroke"). The game assumes a right-handed stance, meaning swinging on the hole will send it to your left. See how few shots you need to get to the ball!
 
-There are three levels built in and they just loop once you finish. ESC to release mouse.
+There are four levels built in and they just loop once you finish. ESC to release mouse.
 
-NOTE: There's a bug on level 3 which sometimes causes the ball to disappear. If this happens just press R. It doesn't seem to happen more than once per game instance.
+NOTE: There's a bug on level 4 which sometimes causes the ball to disappear. If this happens just press R. It doesn't seem to happen more than once per game instance.
 
 This game was built with [NEST](NEST.md).

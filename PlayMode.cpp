@@ -14,6 +14,29 @@
 
 GLuint level_meshes_for_lit_color_texture_program = 0;
 
+Load< MeshBuffer > level0_meshes(LoadTagDefault, []() -> MeshBuffer const * {
+	MeshBuffer const *ret = new MeshBuffer(data_path("levels/lvl0.pnct"));
+	level_meshes_for_lit_color_texture_program = ret->make_vao_for_program(lit_color_texture_program->program);
+	return ret;
+});
+
+Load< Scene > level0_scene(LoadTagDefault, []() -> Scene const * {
+	return new Scene(data_path("levels/lvl0.scene"), [&](Scene &scene, Scene::Transform *transform, std::string const &mesh_name){
+		Mesh const &mesh = level0_meshes->lookup(mesh_name);
+
+		scene.drawables.emplace_back(transform);
+		Scene::Drawable &drawable = scene.drawables.back();
+
+		drawable.pipeline = lit_color_texture_program_pipeline;
+
+		drawable.pipeline.vao = level_meshes_for_lit_color_texture_program;
+		drawable.pipeline.type = mesh.type;
+		drawable.pipeline.start = mesh.start;
+		drawable.pipeline.count = mesh.count;
+
+	});
+});
+
 Load< MeshBuffer > level1_meshes(LoadTagDefault, []() -> MeshBuffer const * {
 	MeshBuffer const *ret = new MeshBuffer(data_path("levels/lvl1.pnct"));
 	level_meshes_for_lit_color_texture_program = ret->make_vao_for_program(lit_color_texture_program->program);
@@ -87,6 +110,9 @@ std::vector< Load <MeshBuffer> > level_meshes_vec;
 std::vector< Load <Scene> > scene_vec;
 
 PlayMode::PlayMode() {
+	level_meshes_vec.emplace_back(level0_meshes);
+	scene_vec.emplace_back(level0_scene);
+
 	level_meshes_vec.emplace_back(level1_meshes);
 	scene_vec.emplace_back(level1_scene);
 	
