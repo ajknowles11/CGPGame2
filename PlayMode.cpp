@@ -461,7 +461,7 @@ void PlayMode::handle_physics(float elapsed) {
 			body_a->force = out_force;
 		}
 		else {// currently this only happens when we finish a hole but it could happen if we make items vacuum
-			if (col.obj_a->is_ball && col.obj_b->is_hole || col.obj_a->is_hole && col.obj_b->is_ball) {
+			if ((col.obj_a->is_ball && col.obj_b->is_hole) || (col.obj_a->is_hole && col.obj_b->is_ball)) {
 				// win level
 				if (col.points.depth > 0.1f)
 					cleanup_next_update = true;
