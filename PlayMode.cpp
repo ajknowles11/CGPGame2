@@ -14,13 +14,13 @@
 
 GLuint level_meshes_for_lit_color_texture_program = 0;
 Load< MeshBuffer > level_meshes(LoadTagDefault, []() -> MeshBuffer const * {
-	MeshBuffer const *ret = new MeshBuffer(data_path("lvl1.pnct"));
+	MeshBuffer const *ret = new MeshBuffer(data_path("levels/lvl2.pnct"));
 	level_meshes_for_lit_color_texture_program = ret->make_vao_for_program(lit_color_texture_program->program);
 	return ret;
 });
 
 Load< Scene > level_scene(LoadTagDefault, []() -> Scene const * {
-	return new Scene(data_path("lvl1.scene"), [&](Scene &scene, Scene::Transform *transform, std::string const &mesh_name){
+	return new Scene(data_path("levels/lvl2.scene"), [&](Scene &scene, Scene::Transform *transform, std::string const &mesh_name){
 		Mesh const &mesh = level_meshes->lookup(mesh_name);
 
 		scene.drawables.emplace_back(transform);
