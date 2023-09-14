@@ -27,6 +27,15 @@ struct PlayMode : Mode {
 		uint8_t pressed = 0;
 	} left, right, down, up;
 
+	// golf club swinging
+	const float swing_max = 0.5f;
+	float swing_acc = 0;
+	float swing_power = 0;
+	bool backswinging = false;
+	bool swinging = false;
+	bool should_swing = false;
+	void swing();
+
 	//local copy of the game scene (so code can change it during gameplay):
 	Scene scene;
 	
@@ -50,9 +59,11 @@ struct PlayMode : Mode {
 	Scene::RigidBody *ball = nullptr;
 	Scene::RigidBody *hole = nullptr;
 
+	float drag = 0.7f;
+
 	// physics
 	void handle_physics(float elapsed);
-	const glm::vec3 gravity = glm::vec3(0,0,-9.8f);//9.8f;
+	const glm::vec3 gravity = glm::vec3(0,0,-9.8f);
 	std::vector<Scene::CollisionObject*> collision_objects;
 
 };

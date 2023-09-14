@@ -179,6 +179,7 @@ struct Scene {
 		Transform * transform = nullptr;
 		bool is_dynamic = false;
 		float damp = 0.95f;
+		float friction = 0.996f;
 	};
 
 	struct RigidBody : CollisionObject {

@@ -44,8 +44,10 @@ PlayMode::PlayMode() : scene(*level_scene) {
 		else if (transform.name == "AimHand") aimhand = &transform;
 		else if (transform.name == "Club") club = &transform;
 
+		else if (transform.name == "Hole") hole = new Scene::RigidBody(&transform, new Scene::SphereCollider(glm::vec3(0), 0.075f));
+
 		else if (transform.name == "Ball") ball = new Scene::RigidBody(&transform, new Scene::SphereCollider(glm::vec3(0), 0.02135f));
-		else if (transform.name == "Ground") collision_objects.emplace_back(new Scene::CollisionObject(&transform, new Scene::PlaneCollider(glm::vec3(0,0,1.0f), 0), 0.4f));
+		else if (transform.name == "Ground") collision_objects.emplace_back(new Scene::CollisionObject(&transform, new Scene::PlaneCollider(glm::vec3(0,0,1.0f), 0), 0.7f));
 	}
 
 	if (player == nullptr) throw std::runtime_error("Player not found.");
@@ -53,11 +55,14 @@ PlayMode::PlayMode() : scene(*level_scene) {
 	if (aimhand == nullptr) throw std::runtime_error("Hand not found.");
 	if (club == nullptr) throw std::runtime_error("Club not found.");
 
+	if (hole == nullptr) throw std::runtime_error("Hole not found.");
 	if (ball == nullptr) throw std::runtime_error("Ball not found.");
 
 
 	collision_objects.emplace_back(ball);
+	collision_objects.emplace_back(hole);
 	ball->transform->position += glm::vec3(0,0,1);
+	hole->transform->position += glm::vec3(0,0,1);
 
 	//get pointer to camera for convenience:
 	if (scene.cameras.size() != 1) throw std::runtime_error("Expecting scene to have exactly one camera, but it has " + std::to_string(scene.cameras.size()));
@@ -119,7 +124,17 @@ bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 			SDL_SetRelativeMouseMode(SDL_TRUE);
 			return true;
 		}
-	} else if (evt.type == SDL_MOUSEMOTION) {
+		else if (evt.button.button == SDL_BUTTON_LEFT && !swinging) {
+			backswinging = true;
+		}
+	} else if (evt.type == SDL_MOUSEBUTTONUP) {
+		if (evt.button.button == SDL_BUTTON_LEFT && backswinging) {
+			backswinging = false;
+			swinging = true;
+			should_swing = true;
+		}
+	}
+	else if (evt.type == SDL_MOUSEMOTION) {
 		if (SDL_GetRelativeMouseMode() == SDL_TRUE) {
 			glm::vec2 motion = glm::vec2(
 				evt.motion.xrel / float(window_size.y),
@@ -168,6 +183,31 @@ void PlayMode::update(float elapsed) {
 		player->position += move.x * frame_right + move.y * frame_forward;
 	}
 
+	{ // club swing
+		if (backswinging) {
+			swing_acc += elapsed;
+			if (swing_acc > swing_max) swing_acc = swing_max;
+			swing_power = swing_acc;
+		}
+		else if (swinging) {
+			swing_acc -= swing_power * 8.0f * elapsed;
+			if (swing_acc < -swing_power) {
+				swing_acc = -swing_power;
+				swinging = false;
+			}
+		}
+		else if (swing_acc < 0) {
+			swing_acc += swing_power * 6.0f * elapsed;
+		}
+		else {
+			swing_acc = 0;
+		}
+
+		if (should_swing) {
+			swing();
+		}
+	}
+
 	{ // attach club to hand
 		// we lerp between hand and aimhand (which is where club held while hitting ball)
 		float alpha = 1-(glm::clamp(glm::eulerAngles(camera->transform->rotation).x, cam_pitch_aim_end, cam_pitch_aim_start) - cam_pitch_aim_end) / (cam_pitch_aim_start - cam_pitch_aim_end);
@@ -180,7 +220,8 @@ void PlayMode::update(float elapsed) {
 		glm::vec3 end_pos = aimhand_world * glm::vec4(0,0,0,1.0f);
 
 		club->position = glm::mix(start_pos, end_pos, alpha);
-		club->rotation = glm::angleAxis(glm::eulerAngles(player->rotation).z, glm::vec3(0.0f,0.0f,1.0f));
+		club->rotation = glm::angleAxis(glm::eulerAngles(player->rotation).z, glm::vec3(0.0f,0.0f,1.0f))
+		* glm::angleAxis(-swing_acc, glm::vec3(0,1.0f,0));
 	}
 
 	// handle physics, thanks Winterdev (https://www.youtube.com/watch?v=-_IspRG548E)
@@ -221,8 +262,9 @@ void PlayMode::handle_physics(float elapsed) {
 		if (!col.obj_a->is_dynamic && !col.obj_b->is_dynamic) continue;
 		else if (!col.obj_a->is_dynamic) { // b is moving
 			Scene::RigidBody *body_b = static_cast<Scene::RigidBody*>(col.obj_b);
-			glm::vec3 out_velocity = col.obj_a->damp * (body_b->velocity - 2.0f * glm::dot(body_b->velocity, -col.points.normal) * -col.points.normal);
-			glm::vec3 out_force = body_b->mass * gravity - 2.0f * -glm::dot(body_b->mass * gravity, col.points.normal) * col.points.normal;
+			if (glm::length(body_b->velocity) < 0.00001f) return;
+			glm::vec3 out_velocity = col.obj_b->friction * (body_b->velocity - 2.0f * col.obj_a->damp * glm::dot(body_b->velocity, -col.points.normal) * -col.points.normal);
+			glm::vec3 out_force = body_b->mass * gravity - 2.0f * glm::dot(body_b->mass * gravity, col.points.normal) * col.points.normal;
 			glm::vec3 out_dir = glm::normalize(out_velocity);
 			// move body_b back to where it hit
 			glm::vec3 vel_dir = glm::normalize(body_b->velocity);
@@ -235,8 +277,9 @@ void PlayMode::handle_physics(float elapsed) {
 		}
 		else if (!col.obj_b->is_dynamic) { // a is moving
 			Scene::RigidBody *body_a = static_cast<Scene::RigidBody*>(col.obj_a);
-			glm::vec3 out_velocity = col.obj_b->damp * (body_a->velocity - 2.0f * glm::dot(body_a->velocity, col.points.normal) * col.points.normal);
-			glm::vec3 out_force = body_a->mass * gravity - 2.0f * -glm::dot(body_a->mass * gravity, col.points.normal) * col.points.normal;
+			if (glm::length(body_a->velocity) < 0.00001f) return;
+			glm::vec3 out_velocity = col.obj_b->friction * (body_a->velocity - 2.0f * col.obj_b->damp * glm::dot(body_a->velocity, col.points.normal) * col.points.normal);
+			glm::vec3 out_force = body_a->mass * gravity - 2.0f * glm::dot(body_a->mass * gravity, -col.points.normal) * col.points.normal;
 			glm::vec3 out_dir = glm::normalize(out_velocity);
 			// move body_a back to where it hit
 			glm::vec3 vel_dir = glm::normalize(body_a->velocity);
@@ -258,13 +301,21 @@ void PlayMode::handle_physics(float elapsed) {
 			Scene::RigidBody *body = static_cast<Scene::RigidBody*>(obj);
 			body->force += body->mass * gravity;
 
-			body->velocity += body->force / body->mass * elapsed;
+			body->velocity += body->force / body->mass * elapsed * drag;
 			body->transform->position += body->velocity * elapsed;
+			std::cout << body->transform->name << ", " << body->force.x << ", " << body->force.y << ", " << body->force.z << "\n";
 
 			body->force = glm::vec3(0);
 		}
 	}
 
+}
+
+void PlayMode::swing() {
+	should_swing = false;
+	if (swing_power > 0) {//can hit hole here
+		hole->velocity += hole->mass * swing_power/swing_max * player->make_local_to_world() * glm::vec4(-5.0f,0,0,0);
+	}
 }
 
 void PlayMode::draw(glm::uvec2 const &drawable_size) {

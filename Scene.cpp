@@ -429,7 +429,7 @@ Scene::CollisionPoints Scene::test_sphere_plane(const Collider *a, const Transfo
 }
 
 Scene::CollisionPoints Scene::test_sphere_box(const Collider *a, const Transform *ta, const Collider *b, const Transform *tb) {
-	
+	return CollisionPoints();
 }
 
 Scene::CollisionPoints Scene::test_collision(const Collider *a, const Transform *ta, const Collider *b, const Transform *tb) {
@@ -455,5 +455,4 @@ Scene::CollisionPoints Scene::test_collision(const Collider *a, const Transform 
 	// we only deal with sphere-related collisions
 	return CollisionPoints();
 }
-
 
