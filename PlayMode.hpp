@@ -47,11 +47,21 @@ struct PlayMode : Mode {
 	float camera_pitch = glm::pi<float>()/2;
 	const float cam_pitch_min = 0;
 	const float cam_pitch_max = glm::pi<float>();
-	const float cam_pitch_aim_start = 0.55f;
-	const float cam_pitch_aim_end = 0.2f;
+
+	const float cam_pitch_aim_start = 0.65f;
+	const float cam_pitch_aim_end = 0.35f;
+
+	bool is_sprinting = false;
 
 	Scene::Transform *hand = nullptr;
 	Scene::Transform *aimhand = nullptr;
 	Scene::Transform *club = nullptr;
+	Scene::RigidBody *ball = nullptr;
+	Scene::RigidBody *hole = nullptr;
+
+	// physics
+	void handle_physics(float elapsed);
+	const glm::vec3 gravity = glm::vec3(0,0,-1.8f);//9.8f;
+	std::vector<Scene::CollisionObject*> collision_objects;
 
 };

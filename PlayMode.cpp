@@ -43,12 +43,21 @@ PlayMode::PlayMode() : scene(*hexapod_scene) {
 		else if (transform.name == "Hand") hand = &transform;
 		else if (transform.name == "AimHand") aimhand = &transform;
 		else if (transform.name == "Club") club = &transform;
+
+		else if (transform.name == "Ball") ball = new Scene::RigidBody(&transform, new Scene::SphereCollider(glm::vec3(0), 0.02135f));
+		else if (transform.name == "Ground") collision_objects.emplace_back(new Scene::CollisionObject(&transform, new Scene::PlaneCollider(glm::vec3(0,0,1.0f), 0)));
 	}
 
 	if (player == nullptr) throw std::runtime_error("Player not found.");
 	if (hand == nullptr) throw std::runtime_error("Hand not found.");
 	if (aimhand == nullptr) throw std::runtime_error("Hand not found.");
 	if (club == nullptr) throw std::runtime_error("Club not found.");
+
+	if (ball == nullptr) throw std::runtime_error("Ball not found.");
+
+
+	collision_objects.emplace_back(ball);
+	ball->transform->position += glm::vec3(0,0,1);
 
 	// //get pointers to leg for convenience:
 	// for (auto &transform : scene.transforms) {
@@ -94,9 +103,14 @@ bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 			down.downs += 1;
 			down.pressed = true;
 			return true;
-		}
-		if (evt.key.keysym.sym == SDLK_F3) {
+		} else if (evt.key.keysym.sym == SDLK_LSHIFT) {
+			is_sprinting = true;
+		} else if (evt.key.keysym.sym == SDLK_F3) {
 			show_fps = !show_fps;
+		} else if (show_fps && evt.key.keysym.sym == SDLK_DOWN) {
+			player->position.z -= 0.2f;
+		} else if (show_fps && evt.key.keysym.sym == SDLK_UP) {
+			player->position.z += 0.2f;
 		}
 	} else if (evt.type == SDL_KEYUP) {
 		if (evt.key.keysym.sym == SDLK_a) {
@@ -111,6 +125,8 @@ bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 		} else if (evt.key.keysym.sym == SDLK_s) {
 			down.pressed = false;
 			return true;
+		} else if (evt.key.keysym.sym == SDLK_LSHIFT) {
+			is_sprinting = false;
 		}
 	} else if (evt.type == SDL_MOUSEBUTTONDOWN) {
 		if (SDL_GetRelativeMouseMode() == SDL_FALSE) {
@@ -164,7 +180,8 @@ void PlayMode::update(float elapsed) {
 	{
 
 		//combine inputs into a move:
-		constexpr float PlayerSpeed = 5.0f;
+		constexpr float PlayerSpeed = 2.0f;
+		float speed_mult = is_sprinting ? 3.0f : 1.0f;
 		glm::vec2 move = glm::vec2(0.0f);
 		if (left.pressed && !right.pressed) move.x =-1.0f;
 		if (!left.pressed && right.pressed) move.x = 1.0f;
@@ -172,7 +189,7 @@ void PlayMode::update(float elapsed) {
 		if (!down.pressed && up.pressed) move.y = 1.0f;
 
 		//make it so that moving diagonally doesn't go faster:
-		if (move != glm::vec2(0.0f)) move = glm::normalize(move) * PlayerSpeed * elapsed;
+		if (move != glm::vec2(0.0f)) move = glm::normalize(move) * PlayerSpeed * speed_mult * elapsed;
 
 		glm::mat4x3 frame = player->make_local_to_parent();
 		glm::vec3 frame_right = frame[0];
@@ -185,7 +202,7 @@ void PlayMode::update(float elapsed) {
 	{ // attach club to hand
 		// we lerp between hand and aimhand (which is where club held while hitting ball)
 		float alpha = 1-(glm::clamp(glm::eulerAngles(camera->transform->rotation).x, cam_pitch_aim_end, cam_pitch_aim_start) - cam_pitch_aim_end) / (cam_pitch_aim_start - cam_pitch_aim_end);
-		std::cout << alpha << "\n";
+		
 		glm::mat4x3 camera_world_transform = camera->transform->make_local_to_world(); // save like 0.00001s by computing once instead of twice
 		glm::mat4x3 hand_world = camera_world_transform * glm::mat4(hand->make_local_to_parent());
 		glm::mat4x3 aimhand_world = camera_world_transform * glm::mat4(aimhand->make_local_to_parent());
@@ -197,11 +214,87 @@ void PlayMode::update(float elapsed) {
 		club->rotation = glm::angleAxis(glm::eulerAngles(player->rotation).z, glm::vec3(0.0f,0.0f,1.0f));
 	}
 
+	// handle physics, thanks Winterdev (https://www.youtube.com/watch?v=-_IspRG548E)
+	handle_physics(elapsed);
+
 	//reset button press counters:
 	left.downs = 0;
 	right.downs = 0;
 	up.downs = 0;
 	down.downs = 0;
+}
+
+void PlayMode::handle_physics(float elapsed) {
+
+	// find collisions
+	std::vector<Scene::Collision> collisions;
+	for (auto obj_a : collision_objects) {
+		for (auto obj_b : collision_objects) {
+			if (obj_a == obj_b) break;
+
+			if (!obj_a->collider || !obj_b->collider)
+				continue;
+			
+			Scene::CollisionPoints points = Scene::test_collision(
+				obj_a->collider, obj_a->transform,
+				obj_b->collider, obj_b->transform
+			);
+
+			if (points.has_collision) {
+				collisions.emplace_back(obj_a, obj_b, points);
+			}
+		}
+	}
+
+	// solve collisions
+	for (auto col : collisions) {
+		if (!col.obj_a->is_dynamic && !col.obj_b->is_dynamic) continue;
+		else if (!col.obj_a->is_dynamic) { // b is moving
+			Scene::RigidBody *body_b = static_cast<Scene::RigidBody*>(col.obj_b);
+			glm::vec3 out_velocity = body_b->velocity - 2.0f * glm::dot(body_b->velocity, -col.points.normal) * -col.points.normal;\
+			glm::vec3 out_force = -glm::dot(body_b->mass * gravity, col.points.normal) * col.points.normal;
+			glm::vec3 out_dir = glm::normalize(out_velocity);
+			// move body_b back to where it hit
+			glm::vec3 vel_dir = glm::normalize(body_b->velocity);
+			float angled_dist = col.points.depth / glm::dot(col.points.normal, vel_dir);
+			body_b->transform->position = body_b->transform->position - vel_dir * angled_dist + out_dir * angled_dist;
+
+			// apply new physics
+			body_b->velocity = out_velocity;
+			body_b->force = out_force;
+		}
+		else if (!col.obj_b->is_dynamic) { // a is moving
+			Scene::RigidBody *body_a = static_cast<Scene::RigidBody*>(col.obj_a);
+			glm::vec3 out_velocity = body_a->velocity - 2.0f * glm::dot(body_a->velocity, col.points.normal) * col.points.normal;
+			glm::vec3 out_force = -glm::dot(body_a->mass * gravity, col.points.normal) * col.points.normal;
+			glm::vec3 out_dir = glm::normalize(out_velocity);
+			// move body_a back to where it hit
+			glm::vec3 vel_dir = glm::normalize(body_a->velocity);
+			float angled_dist = col.points.depth / glm::dot(-col.points.normal, vel_dir);
+			body_a->transform->position = body_a->transform->position - vel_dir * angled_dist + out_dir * angled_dist;
+			
+			// apply new physics
+			body_a->velocity = out_velocity;
+			body_a->force = out_force;
+		}
+		else {
+			// nothing for now
+		}
+	}
+
+	// move dynamics
+	for (auto obj : collision_objects) {
+		if (obj->is_dynamic) {
+			Scene::RigidBody *body = static_cast<Scene::RigidBody*>(obj);
+			body->force += body->mass * gravity;
+
+			body->velocity += body->force / body->mass * elapsed;
+			body->transform->position += body->velocity * elapsed;
+
+			body->force = glm::vec3(0);
+		}
+	}
+
 }
 
 void PlayMode::draw(glm::uvec2 const &drawable_size) {

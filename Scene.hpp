@@ -116,6 +116,87 @@ struct Scene {
 		float spot_fov = glm::radians(45.0f); //spot cone fov (in radians)
 	};
 
+	// -------------------- PHYSICS -------------------------------------------
+
+	// credit to Winterdev for a good physics overview video: https://www.youtube.com/watch?v=-_IspRG548E
+	// and accompanying article: https://winter.dev/articles/physics-engine
+	// and Computer Graphics particle animation assignment for good background
+	enum ColliderType {
+		Sphere,
+		Plane,
+		Box
+	};
+	
+	struct Collider {
+		Collider(ColliderType type_) : type(type_) {}
+		ColliderType type;
+	};
+
+	struct SphereCollider : Collider {
+		SphereCollider(glm::vec3 center_, float radius_) : Collider(ColliderType::Sphere), center(center_), radius(radius_) {}
+		glm::vec3 center;
+		float radius;
+	};
+
+	struct PlaneCollider : Collider {
+		PlaneCollider(glm::vec3 normal_, float distance_) : Collider(ColliderType::Plane), normal(normal_), distance(distance_) {}
+		glm::vec3 normal;
+		float distance;
+	};
+
+	struct CollisionPoints {
+		glm::vec3 a; // furthest point of a in b
+		glm::vec3 b; // furthest point of b in a
+		glm::vec3 normal; // b - a normalized
+		float depth; // length of b-a
+		bool has_collision = false;
+	};
+
+	// collision test functions
+	static CollisionPoints test_sphere_sphere(
+		const Collider *a, const Transform *ta,
+		const Collider *b, const Transform *tb);
+
+	static CollisionPoints test_sphere_plane(
+		const Collider *a, const Transform *ta,
+		const Collider *b, const Transform *tb);
+
+	// sphere box
+
+	// generic func that calls the appropriate specific test func
+	static CollisionPoints test_collision(
+		const Collider *a, const Transform *ta,
+		const Collider *b, const Transform *tb);
+	
+	struct CollisionObject {
+		CollisionObject(Transform *transform_, Collider *collider_) : transform(transform_), collider(collider_) {
+			assert(transform); 
+			assert(collider);
+		}
+		Collider *collider = nullptr;
+		Transform * transform = nullptr;
+		bool is_dynamic = false;
+	};
+
+	struct RigidBody : CollisionObject {
+		RigidBody(Transform *transform_, Collider *collider_) : CollisionObject(transform_, collider_) {
+			is_dynamic = true; 
+		}
+		glm::vec3 velocity = glm::vec3(0);
+		glm::vec3 force = glm::vec3(0);
+		float mass = 1;
+
+	};
+
+	struct Collision {
+		Collision(CollisionObject *a, CollisionObject *b, CollisionPoints p) : obj_a(a), obj_b(b), points(p) {}
+		CollisionObject *obj_a;
+		CollisionObject *obj_b;
+		CollisionPoints points;
+	};
+
+	// ------------------------------------------------------------------------
+
 	//Scenes, of course, may have many of the above objects:
 	std::list< Transform > transforms;
 	std::list< Drawable > drawables;

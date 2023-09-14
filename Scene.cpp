@@ -375,3 +375,82 @@ void Scene::set(Scene const &other, std::unordered_map< Transform const *, Trans
 		l.transform = transform_to_transform.at(l.transform);
 	}
 }
+
+Scene::CollisionPoints Scene::test_sphere_sphere(const Collider *a, const Transform *ta, const Collider *b, const Transform *tb) {
+	const SphereCollider* sp_a = static_cast<const SphereCollider*>(a);
+	const SphereCollider* sp_b = static_cast<const SphereCollider*>(b);
+
+	glm::mat4x3 a_world = ta->make_local_to_world();
+	glm::mat4x3 b_world = tb->make_local_to_world();
+
+	glm::vec3 a_center = a_world * glm::vec4(sp_a->center, 1);
+	glm::vec3 b_center = b_world * glm::vec4(sp_b->center, 1);
+
+	float a_radius = (a_world * glm::vec4(sp_a->radius,0,0,0)).x; //don't use non-uniform scaling PLEASE
+	float b_radius = (b_world * glm::vec4(sp_b->radius,0,0,0)).x;
+
+	if (glm::distance(a_center, b_center) > a_radius + b_radius) return CollisionPoints();
+
+	glm::vec3 dir = a_center - b_center;
+	glm::vec3 normal = glm::normalize(dir);
+
+	glm::vec3 pt_a = -normal * a_radius;
+	glm::vec3 pt_b = normal * b_radius;
+
+	float depth = glm::distance(pt_b, pt_a);
+
+	return CollisionPoints{pt_a, pt_b, normal, depth, true};
+}
+
+Scene::CollisionPoints Scene::test_sphere_plane(const Collider *a, const Transform *ta, const Collider *b, const Transform *tb) {
+	const SphereCollider* sp_a = static_cast<const SphereCollider*>(a);
+	const PlaneCollider* p_b = static_cast<const PlaneCollider*>(b);
+
+	glm::mat4x3 a_world = ta->make_local_to_world();
+	glm::mat4x3 b_world = tb->make_local_to_world();
+
+	glm::vec3 a_center = a_world * glm::vec4(sp_a->center, 1);
+	float a_radius = (a_world * glm::vec4(sp_a->radius,0,0,0)).x; //again this assumes uniform scaling
+
+	glm::vec3 normal = glm::normalize(b_world * glm::vec4(p_b->normal, 0));
+	glm::vec3 b_distance = b_world * glm::vec4(normal * p_b->distance, 0);
+
+	float distance = glm::dot(a_center - b_distance, normal);
+
+	if (distance > a_radius) {
+		return CollisionPoints();
+	}
+
+	glm::vec3 pt_a = a_center - normal * a_radius;
+	glm::vec3 pt_b = a_center - normal * distance;
+	float depth = glm::distance(pt_b, pt_a);
+	
+	return CollisionPoints{pt_a, pt_b, normal, depth, true};
+}
+
+
+Scene::CollisionPoints Scene::test_collision(const Collider *a, const Transform *ta, const Collider *b, const Transform *tb) {
+	if (a->type == ColliderType::Sphere) {
+		if (b->type == ColliderType::Sphere) {
+			return test_sphere_sphere(a, ta, b, tb);
+		}
+		if (b->type == ColliderType::Plane) {
+			return test_sphere_plane(a, ta, b, tb);
+		}
+		if (b->type == ColliderType::Box) {
+			// return test_sphere_box(a, ta, b, tb);
+		}
+	}
+	if (b->type == ColliderType::Sphere) {
+		if (a->type == ColliderType::Plane) {
+			return test_sphere_plane(b, tb, a, ta);
+		}
+		if (a->type == ColliderType::Box) {
+			// return test_sphere_box(b, tb, a, ta);
+		}
+	}
+	// we only deal with sphere-related collisions
+	return CollisionPoints();
+}
+
+
