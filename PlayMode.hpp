@@ -34,6 +34,8 @@ struct PlayMode : Mode {
 	bool backswinging = false;
 	bool swinging = false;
 	bool should_swing = false;
+
+	float max_hit_velocity = 8.0f;
 	void swing();
 
 	//local copy of the game scene (so code can change it during gameplay):
@@ -59,7 +61,7 @@ struct PlayMode : Mode {
 	Scene::RigidBody *ball = nullptr;
 	Scene::RigidBody *hole = nullptr;
 
-	float drag = 0.7f;
+	float drag = 0.3f;
 
 	// physics
 	void handle_physics(float elapsed);

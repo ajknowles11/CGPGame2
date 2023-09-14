@@ -300,8 +300,9 @@ void PlayMode::handle_physics(float elapsed) {
 		if (obj->is_dynamic) {
 			Scene::RigidBody *body = static_cast<Scene::RigidBody*>(obj);
 			body->force += body->mass * gravity;
+			body->force += -body->velocity * drag;
 
-			body->velocity += body->force / body->mass * elapsed * drag;
+			body->velocity += body->force / body->mass * elapsed;
 			body->transform->position += body->velocity * elapsed;
 			std::cout << body->transform->name << ", " << body->force.x << ", " << body->force.y << ", " << body->force.z << "\n";
 
@@ -314,7 +315,7 @@ void PlayMode::handle_physics(float elapsed) {
 void PlayMode::swing() {
 	should_swing = false;
 	if (swing_power > 0) {//can hit hole here
-		hole->velocity += hole->mass * swing_power/swing_max * player->make_local_to_world() * glm::vec4(-5.0f,0,0,0);
+		hole->velocity += hole->mass * swing_power/swing_max * player->make_local_to_world() * glm::vec4(-max_hit_velocity,0,0,0);
 	}
 }
 
