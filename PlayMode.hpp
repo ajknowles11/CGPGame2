@@ -12,7 +12,7 @@ struct PlayMode : Mode {
 	virtual ~PlayMode();
 
 	void init();
-	uint8_t lvl_index;
+	uint8_t lvl_index = 0;
 	void cleanup_go_next();
 	bool loading = true;
 	bool cleanup_next_update = false;
@@ -22,7 +22,7 @@ struct PlayMode : Mode {
 	virtual void update(float elapsed) override;
 	virtual void draw(glm::uvec2 const &drawable_size) override;
 
-	float fps;
+	float fps = 0;
 	bool show_fps = false;
 
 	//----- game state -----

@@ -107,8 +107,8 @@ void PlayMode::init() {
 
 	collision_objects.emplace_back(ball);
 	collision_objects.emplace_back(hole);
-	ball->transform->position += glm::vec3(0,0,1);
-	hole->transform->position += glm::vec3(0,0,1);
+	ball->transform->position += glm::vec3(0,0,0.2f);
+	hole->transform->position += glm::vec3(0,0,0.2f);
 
 	//get pointer to camera for convenience:
 	if (scene.cameras.size() != 1) throw std::runtime_error("Expecting scene to have exactly one camera, but it has " + std::to_string(scene.cameras.size()));
