@@ -197,6 +197,11 @@ struct Scene {
 		float damp = 0.95f;
 		float friction = 0.996f;
 		bool is_pickup = false;
+		float pickup_value = 0.6f;
+		bool is_hole = false;
+		bool is_ball = false;
+
+		bool to_delete = false;
 	};
 
 	struct RigidBody : CollisionObject {

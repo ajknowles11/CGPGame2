@@ -60,6 +60,29 @@ Load< Scene > level2_scene(LoadTagDefault, []() -> Scene const * {
 	});
 });
 
+Load< MeshBuffer > level3_meshes(LoadTagDefault, []() -> MeshBuffer const * {
+	MeshBuffer const *ret = new MeshBuffer(data_path("levels/lvl3.pnct"));
+	level_meshes_for_lit_color_texture_program = ret->make_vao_for_program(lit_color_texture_program->program);
+	return ret;
+});
+
+Load< Scene > level3_scene(LoadTagDefault, []() -> Scene const * {
+	return new Scene(data_path("levels/lvl3.scene"), [&](Scene &scene, Scene::Transform *transform, std::string const &mesh_name){
+		Mesh const &mesh = level3_meshes->lookup(mesh_name);
+
+		scene.drawables.emplace_back(transform);
+		Scene::Drawable &drawable = scene.drawables.back();
+
+		drawable.pipeline = lit_color_texture_program_pipeline;
+
+		drawable.pipeline.vao = level_meshes_for_lit_color_texture_program;
+		drawable.pipeline.type = mesh.type;
+		drawable.pipeline.start = mesh.start;
+		drawable.pipeline.count = mesh.count;
+
+	});
+});
+
 std::vector< Load <MeshBuffer> > level_meshes_vec;
 std::vector< Load <Scene> > scene_vec;
 
@@ -69,6 +92,9 @@ PlayMode::PlayMode() {
 	
 	level_meshes_vec.emplace_back(level2_meshes);
 	scene_vec.emplace_back(level2_scene);
+
+	level_meshes_vec.emplace_back(level3_meshes);
+	scene_vec.emplace_back(level3_scene);
 
 
 	init();
@@ -85,14 +111,27 @@ void PlayMode::init() {
 		else if (transform.name == "AimHand") aimhand = &transform;
 		else if (transform.name == "Club") club = &transform;
 
-		else if (transform.name == "Hole") hole = std::make_shared<Scene::RigidBody>(&transform, std::make_shared<Scene::SphereCollider>(glm::vec3(0), hole_radius_start));
+		else if (transform.name == "Hole") {
+			hole = std::make_shared<Scene::RigidBody>(&transform, std::make_shared<Scene::SphereCollider>(glm::vec3(0), hole_radius_start));
+			hole->is_hole = true;
+		}
 
-		else if (transform.name == "Ball") ball = std::make_shared<Scene::RigidBody>(&transform, std::make_shared<Scene::SphereCollider>(glm::vec3(0), ball_radius_start));
+		else if (transform.name == "Ball") {
+			ball = std::make_shared<Scene::RigidBody>(&transform, std::make_shared<Scene::SphereCollider>(glm::vec3(0), ball_radius_start));
+			ball->is_ball = true;
+		}
+		
+		
 		else if (transform.name == "Ground") collision_objects.emplace_back(std::make_shared<Scene::CollisionObject>(&transform, std::make_shared<Scene::PlaneCollider>(glm::vec3(0,0,1.0f), 0.0f), 0.7f));
 
-		else if (transform.name.substr(0, 4) == "Wall"){
+		else if (transform.name.substr(0, 4) == "Wall") {
 			const Mesh &mesh = level_meshes_vec[lvl_index]->lookup(transform.name);
 			collision_objects.emplace_back(std::make_shared<Scene::CollisionObject>(&transform, std::make_shared<Scene::BoxCollider>(mesh.min, mesh.max)));
+		}
+		else if (transform.name.substr(0, 4) == "Item") {
+			std::shared_ptr<Scene::CollisionObject> item = std::make_shared<Scene::CollisionObject>(&transform, std::make_shared<Scene::SphereCollider>(glm::vec3(0), item_radius));
+			item->is_pickup = true;
+			collision_objects.emplace_back(item);
 		}
 	}
 
@@ -143,7 +182,8 @@ void PlayMode::cleanup_go_next() {
 		init();
 	}
 	else {
-		return;
+		lvl_index = 0;
+		init();
 	}
 }
 
@@ -190,6 +230,11 @@ bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 			return true;
 		} else if (show_fps && evt.key.keysym.sym == SDLK_UP) {
 			player->position.z += 0.2f;
+			return true;
+		}
+		else if (evt.key.keysym.sym == SDLK_r) {
+			lvl_index--;
+			cleanup_go_next();
 			return true;
 		}
 	} else if (evt.type == SDL_KEYUP) {
@@ -355,10 +400,25 @@ void PlayMode::handle_physics(float elapsed) {
 		}
 	}
 
+	uint8_t delete_count = 0;
+
 	// solve collisions
 	for (auto col : collisions) {
+		if (col.obj_a->to_delete || col.obj_b->to_delete) continue;
 		if (!col.obj_a->is_dynamic && !col.obj_b->is_dynamic) continue;
 		else if (!col.obj_a->is_dynamic) { // b is moving
+			if (col.obj_b->is_hole) {
+				if (col.obj_a->is_pickup) { // grow black hole, add mass and delete pickup
+					delete_count++;
+					hole_scale += col.obj_a->pickup_value;
+					hole->transform->scale = glm::vec3(hole_scale);
+					hole->mass = hole_scale;
+					col.obj_a->to_delete = true;
+					col.obj_a->transform->scale = glm::vec3(0);
+					continue;
+				}
+			}
+
 			std::shared_ptr<Scene::RigidBody> body_b = std::static_pointer_cast<Scene::RigidBody>(col.obj_b);
 			if (glm::length(body_b->velocity) < 0.00001f) return;
 			glm::vec3 out_velocity = col.obj_b->friction * (body_b->velocity - 2.0f * col.obj_a->damp * glm::dot(body_b->velocity, -col.points.normal) * -col.points.normal);
@@ -374,6 +434,18 @@ void PlayMode::handle_physics(float elapsed) {
 			body_b->force = out_force;
 		}
 		else if (!col.obj_b->is_dynamic) { // a is moving
+			if (col.obj_a->is_hole) {
+				if (col.obj_b->is_pickup) {
+					delete_count++;
+					hole_scale += col.obj_b->pickup_value;
+					hole->transform->scale = glm::vec3(hole_scale);
+					hole->mass = hole_scale;
+					col.obj_b->to_delete = true;
+					col.obj_b->transform->scale = glm::vec3(0);
+					continue;
+				}
+			}
+
 			std::shared_ptr<Scene::RigidBody> body_a = std::static_pointer_cast<Scene::RigidBody>(col.obj_a);
 			if (glm::length(body_a->velocity) < 0.00001f) return;
 			glm::vec3 out_velocity = col.obj_b->friction * (body_a->velocity - 2.0f * col.obj_b->damp * glm::dot(body_a->velocity, col.points.normal) * col.points.normal);
@@ -388,10 +460,22 @@ void PlayMode::handle_physics(float elapsed) {
 			body_a->velocity = out_velocity;
 			body_a->force = out_force;
 		}
-		else {
-			// only happens for ball/hole right now
-			// win level
-			cleanup_next_update = true;
+		else {// currently this only happens when we finish a hole but it could happen if we make items vacuum
+			if (col.obj_a->is_ball && col.obj_b->is_hole || col.obj_a->is_hole && col.obj_b->is_ball) {
+				// win level
+				if (col.points.depth > 0.1f)
+					cleanup_next_update = true;
+			}
+		}
+	}
+
+	// remove dead pickups
+	// quick deletion from so: https://stackoverflow.com/questions/4713131/removing-item-from-vector-while-iterating
+	if (delete_count > 0) {
+		for (uint8_t i = 0; i < collision_objects.size(); i++) {
+			while (i < collision_objects.size() && collision_objects[i]->to_delete) {
+				collision_objects.erase(collision_objects.begin() + i);
+			}
 		}
 	}
 
@@ -463,12 +547,12 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 		));
 
 		constexpr float H = 0.09f;
-		lines.draw_text("Mouse + WASD to move, LSHIFT to run. Look down + hold LMB to swing.",
+		lines.draw_text("Mouse + WASD to move, LSHIFT to run. Look down + hold LMB to swing. R to reset level.",
 			glm::vec3(-aspect + 0.1f * H, -1.0 + 0.1f * H, 0.0),
 			glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
 			glm::u8vec4(0x00, 0x00, 0x00, 0x00));
 		float ofs = 2.0f / drawable_size.y;
-		lines.draw_text("Mouse + WASD to move, LSHIFT to run. Look down + hold LMB to swing.",
+		lines.draw_text("Mouse + WASD to move, LSHIFT to run. Look down + hold LMB to swing. R to reset level.",
 			glm::vec3(-aspect + 0.1f * H + ofs, -1.0 + 0.1f * H + ofs, 0.0),
 			glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
 			glm::u8vec4(0xff, 0xff, 0xff, 0x00));

@@ -48,7 +48,8 @@ struct PlayMode : Mode {
 
 	// hole/ball stuff
 	const float hole_radius_start = 0.075f;
-	const float ball_radius_start = 0.02135f;
+	const float ball_radius_start = 0.03f;
+	const float item_radius = 0.15f;
 	const float hole_pull_strength_start = 0.1f;
 	const float min_pull_strength = 0.2f;
 	float hole_scale = 1.0f;
