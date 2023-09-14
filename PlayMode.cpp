@@ -310,7 +310,6 @@ void PlayMode::handle_physics(float elapsed) {
 			if (body->transform->name == "Ball") {
 				const float hole_dist = glm::max(0.005f, glm::distance(body->transform->position, hole->transform->position));
 				const float pull_strength = (hole_pull_strength_start*hole_scale*hole_scale/hole_dist);
-				std::cout << "Pull strength: " << pull_strength << '\n';
 				if (pull_strength >= min_pull_strength) {
 					body->force += glm::normalize(hole->transform->position - body->transform->position) * pull_strength * body->mass;
 				}
@@ -327,7 +326,10 @@ void PlayMode::handle_physics(float elapsed) {
 
 void PlayMode::swing() {
 	should_swing = false;
-	if (swing_power > 0) {//can hit hole here
+	const glm::vec3 hole_pos = hole->transform->make_local_to_world() * glm::vec4(0,0,0,1);
+	const float dist = glm::distance(hole_pos, player->position);
+	std::cout << dist << '\n';
+	if (swing_power > 0 && dist <= hit_radius + hole_radius_start * hole_scale) {//can hit hole here
 		hole->velocity += hole->mass * swing_power/swing_max * player->make_local_to_world() * glm::vec4(-max_hit_velocity,0,0,0);
 	}
 }

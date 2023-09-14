@@ -36,6 +36,7 @@ struct PlayMode : Mode {
 	bool should_swing = false;
 
 	float max_hit_velocity = 8.0f;
+	const float hit_radius = 0.3f;
 	void swing();
 
 

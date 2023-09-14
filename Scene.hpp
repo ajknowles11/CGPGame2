@@ -181,11 +181,16 @@ struct Scene {
 			assert(transform); 
 			assert(collider);
 		}
+		CollisionObject(Transform *transform_, Collider *collider_, bool is_pickup_) : transform(transform_), collider(collider_), is_pickup(is_pickup_) {
+			assert(transform); 
+			assert(collider);
+		}
 		Transform * transform = nullptr;
 		Collider *collider = nullptr;
 		bool is_dynamic = false;
 		float damp = 0.95f;
 		float friction = 0.996f;
+		bool is_pickup = false;
 	};
 
 	struct RigidBody : CollisionObject {
