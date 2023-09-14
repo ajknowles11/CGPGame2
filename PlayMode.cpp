@@ -48,6 +48,11 @@ PlayMode::PlayMode() : scene(*level_scene) {
 
 		else if (transform.name == "Ball") ball = new Scene::RigidBody(&transform, new Scene::SphereCollider(glm::vec3(0), 0.02135f));
 		else if (transform.name == "Ground") collision_objects.emplace_back(new Scene::CollisionObject(&transform, new Scene::PlaneCollider(glm::vec3(0,0,1.0f), 0), 0.7f));
+
+		else if (transform.name.substr(0, 4) == "Wall"){
+			const Mesh &mesh = level_meshes->lookup(transform.name);
+			collision_objects.emplace_back(new Scene::CollisionObject(&transform, new Scene::BoxCollider(mesh.min, mesh.max)));
+		}
 	}
 
 	if (player == nullptr) throw std::runtime_error("Player not found.");
@@ -159,7 +164,7 @@ bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 
 void PlayMode::update(float elapsed) {
 	fps = 1.0f / elapsed;
-
+std::cout << "HOLE POSITION: " << hole->transform->position.x << ", " << hole->transform->position.y << ", " << hole->transform->position.z << "\n";
 	//move player:
 	{
 

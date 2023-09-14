@@ -439,15 +439,11 @@ Scene::CollisionPoints Scene::test_sphere_box(const Collider *a, const Transform
 	// we convert a to b space because it allows us to use non-axis-aligned boxes while keeping code a bit easier
 	// algo from Mozilla docs: https://developer.mozilla.org/en-US/docs/Games/Techniques/3D_collision_detection
 	const glm::mat4x3 a_local_to_b = tb->make_world_to_local() * glm::mat4(ta->make_local_to_world());
+	const glm::mat4x3 b_local_to_world = tb->make_local_to_world();
 
 	const glm::vec3 a_center = a_local_to_b * glm::vec4(sp_a->center, 1);
 	const float a_radius = (a_local_to_b * glm::vec4(sp_a->radius,0,0,0)).x; // uniform scale again
-
-	const glm::vec3 b_center = glm::mix(b_b->min, b_b->max, 0.5f);
-	if (a_center == b_center) {
-		return CollisionPoints();
-	}
-
+	
 	// get closest box pt to sphere center
 	// this is kinda like clamping? but I don't think glm::clamp exactly works here (without some finagling)
 	const float close_x = glm::max(b_b->min.x, glm::min(a_center.x, b_b->max.x));
@@ -460,17 +456,10 @@ Scene::CollisionPoints Scene::test_sphere_box(const Collider *a, const Transform
 		return CollisionPoints();
 	}
 
-	glm::vec3 pt_a;
-	if (glm::distance(b_center, a_center) <= a_radius) {
-		pt_a = b_center;
-	}
-	else {
-		const glm::vec3 to_b_center = glm::normalize(b_center - a_center);
-		pt_a = a_center + to_b_center * a_radius;
-	}
+	const glm::vec3 normal = glm::normalize(a_center - pt_b);
+	const glm::vec3 pt_a = a_center - a_radius * normal;
 
-	const glm::vec3 normal = glm::normalize(pt_b - pt_a);
-	const float depth = glm::length(normal);
+	const float depth = glm::distance(pt_b, pt_a);
 
 	return CollisionPoints{pt_a, pt_b, normal, depth, true};
 }
